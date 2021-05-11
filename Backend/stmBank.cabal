@@ -1,0 +1,45 @@
+cabal-version:       3.0
+
+name:                stm-bank
+version:             0.1.0.0
+author:              Pascal Andermatt, Turan Ledermann
+maintainer:          pascal.andermatt@students.fhnw.ch, turan.ledermann@students.fhnw.ch
+build-type:          Simple
+
+common common-properties
+  default-language: Haskell2010
+  build-depends:
+    base >=4.13 && <5
+   ,scotty ==0.12
+   ,wai-extra ==3.1.2
+   ,directory ==1.3.6.1
+   ,transformers
+   ,text >=1.2.3
+  ghc-options:
+    -Wall
+
+library
+  import: common-properties
+  exposed-modules:     StmBank
+  -- other-modules:
+  -- other-extensions:
+  build-depends:       
+  hs-source-dirs:      lib
+
+executable stmbank
+  import: common-properties
+  main-is:             Main.hs
+  -- other-modules:
+  -- other-extensions:
+  build-depends:       stm-bank
+  hs-source-dirs:      app
+  ghc-options: -threaded -rtsopts 
+
+test-suite stmbank-test
+  import: common-properties
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             StmBankTest.hs
+  build-depends:       tasty >= 1.3
+                     , tasty-hunit 
+                     , stm-bank
