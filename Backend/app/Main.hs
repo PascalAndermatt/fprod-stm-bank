@@ -41,6 +41,12 @@ main = do
         status status200
         json (toJSON response)) maybeAccount
 
+    post "/accounts" $ do
+      jdata <- jsonData :: ActionM StmBank.BankAccountRequest
+      let name = StmBank.nameRequest jdata
+      liftIO (putStrLn name)
+      status status201
+
     post "/name" $ do
       -- name <- param "Name" -- Parameter aus dem Form
       file "static/index.html"

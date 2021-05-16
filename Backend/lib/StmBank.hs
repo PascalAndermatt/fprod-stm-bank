@@ -6,7 +6,7 @@ module StmBank
 (
     getInitialAccounts, createInitialBank, findBankAccountById,
     BankAccount, Bank, BankAccountResponse, toBankAccountResponse, 
-    createAccountFromTuple, accounts
+    createAccountFromTuple, accounts, BankAccountRequest, nameRequest, balanceRequest
 )
 where
 
@@ -26,6 +26,7 @@ type Map k v = Map.Map k v
 data BankAccount         = BankAccount { ibanNr :: String, name :: String, balance :: TVar Int }
 data BankAccountResponse = BankAccountResponse { ibanNrR :: String, nameR :: String, balanceR :: Int }
 data Bank                = Bank { accounts:: Map String BankAccount}
+data BankAccountRequest  = BankAccountRequest {nameRequest:: String, balanceRequest:: Int }
 
 
 instance ToJSON BankAccountResponse where
@@ -40,10 +41,10 @@ toBankAccountResponse (BankAccount i n b) = do
                       bal <- readTVarIO b
                       pure (BankAccountResponse i n bal)
 
--- instance FromJSON Person where
---      parseJSON (Object v) = Person <$>
---                             v .:  "firstName"    <*>
---                             v .:  "lastName"
+instance FromJSON BankAccountRequest where
+      parseJSON (Object v) = BankAccountRequest <$>
+                             v .:  "owner"    <*>
+                             v .:  "balance"
 
 findBankAccountById :: String -> Bank -> Maybe BankAccount
 findBankAccountById ibanNr bank = Map.lookup ibanNr (accounts bank)
