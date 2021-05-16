@@ -20,12 +20,13 @@ common common-properties
    ,containers ==0.6.4.1
    ,aeson ==1.4.7.1
    ,http-types
+   ,random ==1.2.0
   ghc-options:
     -Wall
 
 library
   import: common-properties
-  exposed-modules:     StmBank
+  exposed-modules:     StmBank, StmBank.Util
   -- other-modules:
   -- other-extensions:
   build-depends:       
