@@ -6,7 +6,8 @@ module StmBank
 (
     getInitialAccounts, createInitialBank, findBankAccountById,
     BankAccount, Bank, BankAccountResponse, toBankAccountResponse, 
-    createAccountFromTuple, accounts, BankAccountRequest, nameRequest, balanceRequest
+    createAccountFromTuple, accounts, BankAccountRequest, createAccountFromRequest,
+    addBankAccount
 )
 where
 
@@ -55,6 +56,9 @@ getInitialAccounts = mapM createAccountFromTuple [("Pascal", 100), ("Turan", 200
 createAccountFromTuple :: (String, Int) -> IO BankAccount
 createAccountFromTuple (name, initBal) = createAccount name initBal
 
+createAccountFromRequest :: BankAccountRequest -> IO BankAccount
+createAccountFromRequest (BankAccountRequest owner bal) = createAccount owner bal
+
 createAccount :: String -> Int -> IO BankAccount
 createAccount name initBal = do
   iban <- getIban name
@@ -82,8 +86,8 @@ addBankAccount tVarBank newAccount = do
     writeTVar tVarBank (Bank (Map.insert (ibanNr newAccount) newAccount (accounts bank)))
 
 
-createInitialBank :: [BankAccount] -> Bank
-createInitialBank bankAccounts =  Bank (Map.fromList (zip keys bankAccounts))
+createInitialBank :: [BankAccount] -> IO (TVar Bank)
+createInitialBank bankAccounts =  newTVarIO (Bank (Map.fromList (zip keys bankAccounts)))
           where keys = map ibanNr bankAccounts
 
 

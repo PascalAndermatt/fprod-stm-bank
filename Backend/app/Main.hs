@@ -22,7 +22,7 @@ import qualified Data.Map.Strict as Map
 main :: IO ()
 main = do
   accs <- StmBank.getInitialAccounts -- create initial account list
-  bank <- pure (StmBank.createInitialBank accs) -- create bank with accounts
+  tVarBank <- liftIO (StmBank.createInitialBank accs) -- create bank with accounts
   
   scotty 4000 $ do
     middleware logStdoutDev
@@ -30,11 +30,13 @@ main = do
     get "/" $ file "static/index.html"
 
     get "/accounts" $ do
+      bank <- liftIO (readTVarIO tVarBank)
       response <- liftIO (mapM StmBank.toBankAccountResponse (Map.elems (StmBank.accounts bank)))
       json (toJSON response)
 
     get "/accounts/:id" $ do
       accountId <- param "id" -- id as String
+      bank <- liftIO (readTVarIO tVarBank)
       let maybeAccount = StmBank.findBankAccountById accountId bank
       maybe (status status404) (\acc -> do
         response <- liftIO (StmBank.toBankAccountResponse acc)
@@ -42,9 +44,9 @@ main = do
         json (toJSON response)) maybeAccount
 
     post "/accounts" $ do
-      jdata <- jsonData :: ActionM StmBank.BankAccountRequest
-      let name = StmBank.nameRequest jdata
-      liftIO (putStrLn name)
+      bankAccountRequest <- jsonData :: ActionM StmBank.BankAccountRequest
+      newAccount <- liftIO (StmBank.createAccountFromRequest bankAccountRequest)
+      liftIO (atomically (StmBank.addBankAccount tVarBank newAccount))
       status status201
 
     post "/name" $ do
