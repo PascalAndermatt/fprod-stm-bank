@@ -18,6 +18,8 @@ common common-properties
    ,hashable
    ,stm ==2.5.0.0
    ,containers ==0.6.4.1
+   ,aeson ==1.4.7.1
+   ,http-types
   ghc-options:
     -Wall
 

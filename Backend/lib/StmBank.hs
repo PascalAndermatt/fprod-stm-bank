@@ -1,9 +1,11 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-|
 Dieses Modul enthält Funktionen um...
 -}
 module StmBank 
 (
-    
+    getInitialAccounts, createInitialBank, findBankAccountById
+    , BankAccount, Bank, BankAccountResponse, toBankAccountResponse, createAccountFromTriple
 )
 where
 
@@ -12,11 +14,35 @@ import Control.Concurrent ( threadDelay, forkIO )
 import Control.Concurrent.STM
 import Data.Char
 import qualified Data.Map.Strict as Map
+import qualified Data.Text.Lazy as T
+import           Data.Aeson.Types
 
 type Map k v = Map.Map k v
 
 data BankAccount = BankAccount { accId :: String, name :: String, balance :: TVar Int }
+data BankAccountResponse = BankAccountResponse { accIdr :: String, namer :: String, balancer :: Int }
+data Bank = Bank { accounts:: Map Int BankAccount}
 
+
+instance ToJSON BankAccountResponse where
+  toJSON (BankAccountResponse ibanNr owner bal) = object ["ibanNr" .= (stringToJson ibanNr), "owner" .= (stringToJson owner), "balance" .= (toJSON bal)]
+
+
+toBankAccountResponse :: BankAccount -> IO BankAccountResponse
+toBankAccountResponse (BankAccount i n b) = do
+                      bal <- readTVarIO b
+                      pure (BankAccountResponse i n bal)
+
+stringToJson :: String -> Value
+stringToJson s = toJSON (T.pack s)
+
+-- instance FromJSON Person where
+--      parseJSON (Object v) = Person <$>
+--                             v .:  "firstName"    <*>
+--                             v .:  "lastName"
+
+findBankAccountById :: Int -> Bank -> Maybe BankAccount
+findBankAccountById accountId bank = Map.lookup accountId (accounts bank)
 
 getInitialAccounts :: STM [BankAccount]
 getInitialAccounts = mapM createAccountFromTriple [("1","Pascal", 100), ("2","Turan", 200)]
@@ -43,14 +69,14 @@ transfer accountA accountB amount = do
     deposit accountB amount
 
 
-addBankAccount :: TVar (Map Int BankAccount) -> BankAccount -> Int -> STM ()
-addBankAccount tVar newAccount accIdNr = do
-    accounts <- readTVar tVar
-    writeTVar tVar (Map.insert accIdNr newAccount accounts)
+addBankAccount :: TVar Bank -> BankAccount -> Int -> STM ()
+addBankAccount tVarBank newAccount accIdNr = do
+    bank <- readTVar tVarBank
+    writeTVar tVarBank (Bank (Map.insert accIdNr newAccount (accounts bank)))
 
 
-createInitialBank :: [BankAccount] -> (Map Int BankAccount)
-createInitialBank bankAccounts =  Map.fromList (zip [1..] bankAccounts)
+createInitialBank :: [BankAccount] -> Bank
+createInitialBank bankAccounts =  Bank (Map.fromList (zip [1..] bankAccounts))
 
 
 getIban :: String -> String -> String
