@@ -11,6 +11,7 @@ import           Control.Monad.IO.Class (liftIO)
 import           Network.Wai.Middleware.RequestLogger (logStdoutDev)
 import           System.Directory (listDirectory)
 import           Web.Scotty (file, get, html, middleware, param, post, scotty)
+import           Data.Hashable
 
 -- |Haupteinstiegspunkt, startet den Webserver.
 main :: IO ()
@@ -19,13 +20,15 @@ main = scotty 4000 $ do
 
   get "/" $ file "static/index.html"
 
+  get "/accounts/:id" $ do
+    accountId <- param "id" -- id as String
+    -- liftIO (putStrLn ("account with id: " ++ accountId))
+    file "static/index.html"
+
   post "/name" $ do
-    name <- param "Name" -- Parameter aus dem Form
+    -- name <- param "Name" -- Parameter aus dem Form
     -- IO Actions müssen mit liftIO zu einer ActionM 'angehoben' werden
-    liftIO (writeFile "data/name.txt" name)
-    html (T.pack (StmBank.createPage ("Wrote " ++ name ++ " to data/name.txt")))
+    file "static/index.html"
 
   get "/list/:foldername" $ do
-    folderName <- param "foldername"
-    files <- liftIO (listDirectory folderName)
-    html (T.pack (StmBank.createPage ("Number of files: " ++ show (length files) ++ " in " ++ folderName)))
+    file "static/index.html"
