@@ -7,7 +7,8 @@ module StmBank
     getInitialAccounts, createInitialBank, findBankAccountById,
     BankAccount, Bank (..), BankAccountResponse, toBankAccountResponse, 
     createAccountFromTriple, ibanNr, BankAccountRequest, createAccountFromRequest,
-    addBankAccount, withDraw, deposit, BalanceUpdate, BankAccounts
+    addBankAccount, withDraw, deposit, BalanceUpdate, BankAccounts, TransferRequest,
+    transferFromRequest
 )
 where
 
@@ -29,6 +30,7 @@ data BankAccountResponse = BankAccountResponse { ibanNrR :: String, nameR :: Str
 type BankAccounts        = Map String BankAccount
 data Bank                = Bank { accounts:: TVar BankAccounts}
 data BankAccountRequest  = BankAccountRequest {nameRequest:: String, balanceRequest:: Int }
+data TransferRequest     = TransferRequest {from :: String, to :: String, amount :: Int}
 type BalanceUpdate       = BankAccount -> Int -> STM ()
 
 
@@ -48,6 +50,24 @@ instance FromJSON BankAccountRequest where
       parseJSON (Object v) = BankAccountRequest <$>
                              v .:  "owner"    <*>
                              v .:  "balance"
+
+instance FromJSON TransferRequest where
+    parseJSON (Object v) = TransferRequest <$>
+                            v .: "from" <*>
+                            v .: "to"   <*>
+                            v .: "amount"
+
+
+transferFromRequest :: TransferRequest -> BankAccounts -> STM ()
+transferFromRequest (TransferRequest from to amount) bankAccounts = do
+            maybe (pure ()) (\(f,t) -> transfer f t amount) (maybeAccountsForTransfer from to bankAccounts)
+
+
+maybeAccountsForTransfer :: String -> String -> BankAccounts -> Maybe (BankAccount, BankAccount)
+maybeAccountsForTransfer ibanFrom ibanTo bankAccounts = do
+        from <- findBankAccountById ibanFrom bankAccounts
+        to   <- findBankAccountById ibanTo bankAccounts
+        return (from,to)
 
 findBankAccountById :: String -> BankAccounts -> Maybe BankAccount
 findBankAccountById = Map.lookup

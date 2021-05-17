@@ -73,6 +73,14 @@ main = do
         runStmActionAtomically (updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.deposit)
         response <- runStmActionAtomically (StmBank.toBankAccountResponse acc)
         json (toJSON response)) maybeAccount
+    
+    post "/accounts/transfer" $ do
+      transferRequest <- jsonData :: ActionM StmBank.TransferRequest
+
+      let tVarBankAccounts = (StmBank.accounts bank)
+      bankAccounts <- liftIO (readTVarIO tVarBankAccounts)
+
+      runStmActionAtomically (StmBank.transferFromRequest transferRequest bankAccounts)
 
 
 updateBalanceOfAccountInBank :: TVar StmBank.BankAccounts -> StmBank.BankAccount -> Int -> StmBank.BalanceUpdate -> STM ()
