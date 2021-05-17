@@ -6,8 +6,8 @@ module StmBank
 (
     getInitialAccounts, createInitialBank, findBankAccountById,
     BankAccount, Bank (..), BankAccountResponse, toBankAccountResponse, 
-    createAccountFromTuple, accounts, ibanNr, BankAccountRequest, createAccountFromRequest,
-    addBankAccount, withDraw
+    createAccountFromTriple, ibanNr, BankAccountRequest, createAccountFromRequest,
+    addBankAccount, withDraw, deposit, BalanceUpdate, BankAccounts
 )
 where
 
@@ -15,19 +15,21 @@ import Control.Monad ( replicateM_ )
 import Control.Concurrent ( threadDelay, forkIO )
 import Control.Concurrent.STM
 import Data.Char
+import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Text.Lazy as T
 import           Data.Aeson.Types
 import qualified StmBank.Util as StmUtil
-import           System.Random (randomRIO)
 import           Data.Hashable
 
-type Map k v = Map.Map k v
+-- type Map k v = Map.Map k v
 
 data BankAccount         = BankAccount { ibanNr :: String, name :: String, balance :: TVar Int }
 data BankAccountResponse = BankAccountResponse { ibanNrR :: String, nameR :: String, balanceR :: Int }
-data Bank                = Bank { accounts:: Map String BankAccount}
+type BankAccounts        = Map String BankAccount
+data Bank                = Bank { accounts:: TVar BankAccounts}
 data BankAccountRequest  = BankAccountRequest {nameRequest:: String, balanceRequest:: Int }
+type BalanceUpdate       = BankAccount -> Int -> STM ()
 
 
 instance ToJSON BankAccountResponse where
@@ -37,9 +39,9 @@ instance ToJSON BankAccountResponse where
     "balance" .= (toJSON bal)]
 
 
-toBankAccountResponse :: BankAccount -> IO BankAccountResponse
+toBankAccountResponse :: BankAccount -> STM BankAccountResponse
 toBankAccountResponse (BankAccount i n b) = do
-                      bal <- readTVarIO b
+                      bal <- readTVar b
                       pure (BankAccountResponse i n bal)
 
 instance FromJSON BankAccountRequest where
@@ -47,22 +49,26 @@ instance FromJSON BankAccountRequest where
                              v .:  "owner"    <*>
                              v .:  "balance"
 
-findBankAccountById :: String -> Bank -> Maybe BankAccount
-findBankAccountById ibanNr bank = Map.lookup ibanNr (accounts bank)
+findBankAccountById :: String -> BankAccounts -> Maybe BankAccount
+findBankAccountById = Map.lookup
 
 getInitialAccounts :: IO [BankAccount]
-getInitialAccounts = mapM createAccountFromTuple [("Pascal", 100), ("Turan", 200)]
+getInitialAccounts = do
+    result <- mapM (\(o,b) -> do
+        randomSalt <- StmUtil.generateRandomSalt
+        pure (o,b,randomSalt)) [("Pascal", 100), ("Turan", 200)]
+    atomically (mapM createAccountFromTriple result)
 
-createAccountFromTuple :: (String, Int) -> IO BankAccount
-createAccountFromTuple (name, initBal) = createAccount name initBal
+createAccountFromTriple :: (String, Int, Int) -> STM BankAccount
+createAccountFromTriple (owner, initBal, randomSalt) = createAccount owner initBal randomSalt
 
-createAccountFromRequest :: BankAccountRequest -> IO BankAccount
+createAccountFromRequest :: BankAccountRequest -> Int -> STM BankAccount
 createAccountFromRequest (BankAccountRequest owner bal) = createAccount owner bal
 
-createAccount :: String -> Int -> IO BankAccount
-createAccount owner initBal = do
-  iban <- getIban owner
-  atomically ((BankAccount iban owner) <$> newTVar initBal)
+createAccount :: String -> Int -> Int -> STM BankAccount
+createAccount owner initBal randomSalt = do
+  let iban = createIban randomSalt owner 
+  BankAccount iban owner <$> newTVar initBal
 
 withDraw :: BankAccount -> Int -> STM ()
 withDraw (BankAccount _ _ tVarBal) amount = do
@@ -80,25 +86,25 @@ transfer accountA accountB amount = do
     deposit accountB amount
 
 
-addBankAccount :: TVar Bank -> BankAccount -> STM ()
-addBankAccount tVarBank newAccount = do
-    bank <- readTVar tVarBank
-    writeTVar tVarBank (Bank (Map.insert (ibanNr newAccount) newAccount (accounts bank)))
+addBankAccount :: TVar BankAccounts -> BankAccount -> STM ()
+addBankAccount tVarBankAccounts newAccount = do
+    bankAccounts <- readTVar tVarBankAccounts
+    writeTVar tVarBankAccounts (Map.insert (ibanNr newAccount) newAccount bankAccounts)
 
 
-createInitialBank :: [BankAccount] -> IO (TVar Bank)
-createInitialBank bankAccounts =  newTVarIO (Bank (Map.fromList (zip keys bankAccounts)))
-          where keys = map ibanNr bankAccounts
+createInitialBank :: [BankAccount] -> STM Bank
+createInitialBank bankAccounts =  do
+                        tVarBankAccounts <- newTVar (Map.fromList (zip keys bankAccounts))
+                        pure (Bank tVarBankAccounts)
+                        where keys = map ibanNr bankAccounts
 
 
-getIban :: String -> IO String
-getIban owner = do
-  randomNum <- randomRIO (0,100)
-  let hashVal = abs (hashWithSalt randomNum owner)
-  pure ("CH" ++ (show hashVal)  ++ (map toUpper (take 3 owner)))
+createIban :: Int -> String -> String
+createIban randomNumber owner = "CH" ++ (show hashVal) ++ (map toUpper (take 3 owner))
+                            where hashVal = abs (hashWithSalt randomNumber owner)
 
 
-showAccount :: BankAccount -> IO String
+showAccount :: BankAccount -> IO String -- evtl. STM Action
 showAccount (BankAccount iban owner tVarbal) = do
     bal <- readTVarIO tVarbal
     pure ("Bankaccount: id: " ++ iban ++ ", name: " ++ owner ++ ", balance: " ++ show bal)

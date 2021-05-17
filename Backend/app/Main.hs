@@ -13,12 +13,13 @@ import           Data.Aeson.Types
 import           Control.Concurrent.STM
 import           Network.HTTP.Types
 import qualified Data.Map.Strict as Map
+import qualified StmBank.Util as StmUtil
 
 -- |Haupteinstiegspunkt, startet den Webserver.
 main :: IO ()
 main = do
   accs <- StmBank.getInitialAccounts -- create initial account list
-  tVarBank <- liftIO (StmBank.createInitialBank accs) -- create bank with accounts
+  bank <- atomically (StmBank.createInitialBank accs) -- create bank with accounts
   
   scotty 4000 $ do
     middleware logStdoutDev
@@ -26,44 +27,60 @@ main = do
     get "/" $ file "static/index.html"
 
     get "/accounts" $ do
-      bank <- liftIO (readTVarIO tVarBank)
-      response <- liftIO (mapM StmBank.toBankAccountResponse (Map.elems (StmBank.accounts bank)))
+      bankAccounts <- liftIO (readTVarIO (StmBank.accounts bank))
+      response <- runStmActionAtomically (mapM StmBank.toBankAccountResponse (Map.elems bankAccounts))
       json (toJSON response)
 
     get "/accounts/:id" $ do
-      accountId <- param "id" -- id as String
-      bank <- liftIO (readTVarIO tVarBank)
-      let maybeAccount = StmBank.findBankAccountById accountId bank
+      accountId <- param "id"
+      bankAccounts <- liftIO (readTVarIO (StmBank.accounts bank))
+      let maybeAccount = StmBank.findBankAccountById accountId bankAccounts
       maybe (status status404) (\acc -> do
-        response <- liftIO (StmBank.toBankAccountResponse acc)
-        status status200
+        response <- runStmActionAtomically (StmBank.toBankAccountResponse acc)
         json (toJSON response)) maybeAccount
 
     post "/accounts" $ do
       bankAccountRequest <- jsonData :: ActionM StmBank.BankAccountRequest
-      newAccount <- liftIO (StmBank.createAccountFromRequest bankAccountRequest)
-      liftIO (atomically (StmBank.addBankAccount tVarBank newAccount))
+      randomSalt <- liftIO StmUtil.generateRandomSalt
+      newAccount <- runStmActionAtomically (StmBank.createAccountFromRequest bankAccountRequest randomSalt)
+      runStmActionAtomically (StmBank.addBankAccount (StmBank.accounts bank) newAccount)
       status status201
 
     post "/accounts/:id/withdraw" $ do
       iban <- param "id"
       amount <- param "amount"
-      liftIO (putStrLn "fdg")
       -- adjust :: Ord k => (a -> a) -> k -> Map k a -> Map k a
       -- modifyTVar :: TVar a -> (a -> a) -> STM ()
-      bank <- liftIO (readTVarIO tVarBank)
-      let maybeAccount = StmBank.findBankAccountById iban bank
+      let tVarBankAccounts = (StmBank.accounts bank)
+      bankAccounts <- liftIO (readTVarIO tVarBankAccounts)
+      let maybeAccount = StmBank.findBankAccountById iban bankAccounts
 
       maybe (status status404) (\acc -> do
-        liftIO (atomically (modifyBank tVarBank acc amount))
-        response <- liftIO (StmBank.toBankAccountResponse acc)
-        status status200
+        runStmActionAtomically (updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.withDraw)
+        response <- runStmActionAtomically (StmBank.toBankAccountResponse acc)
+        json (toJSON response)) maybeAccount
+
+    post "/accounts/:id/deposit" $ do
+      iban <- param "id"
+      amount <- param "amount"
+
+      let tVarBankAccounts = (StmBank.accounts bank)
+      bankAccounts <- liftIO (readTVarIO tVarBankAccounts)
+
+      let maybeAccount = StmBank.findBankAccountById iban bankAccounts
+
+      maybe (status status404) (\acc -> do
+        runStmActionAtomically (updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.deposit)
+        response <- runStmActionAtomically (StmBank.toBankAccountResponse acc)
         json (toJSON response)) maybeAccount
 
 
+updateBalanceOfAccountInBank :: TVar StmBank.BankAccounts -> StmBank.BankAccount -> Int -> StmBank.BalanceUpdate -> STM ()
+updateBalanceOfAccountInBank tVarBankAccounts acc amount f = do
+  bankAccounts <- readTVar tVarBankAccounts
+  f acc amount
+  writeTVar tVarBankAccounts (Map.adjust (\_ -> acc) (StmBank.ibanNr acc) bankAccounts)
 
-modifyBank :: TVar StmBank.Bank -> StmBank.BankAccount -> String -> STM ()
-modifyBank tVarBank account amount = do
-  bank <- readTVar tVarBank
-  StmBank.withDraw account (read amount :: Int)
-  writeTVar tVarBank (StmBank.Bank (Map.adjust (\_ -> account) (StmBank.ibanNr account) (StmBank.accounts bank)))
+
+runStmActionAtomically :: STM a -> ActionM a
+runStmActionAtomically stmAction = liftIO (atomically stmAction)
