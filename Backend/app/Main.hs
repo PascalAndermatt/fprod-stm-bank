@@ -6,16 +6,12 @@ Dieses Modul enthält den Einstiegspunkt um die Applikation zu starten.
 module Main where
 
 import qualified StmBank
-import qualified Data.Text.Lazy as T
 import           Control.Monad.IO.Class (liftIO)
 import           Network.Wai.Middleware.RequestLogger (logStdoutDev)
-import           System.Directory (listDirectory)
 import           Web.Scotty
-import           Data.Hashable
 import           Data.Aeson.Types
 import           Control.Concurrent.STM
 import           Network.HTTP.Types
-import qualified StmBank.Util as StmUtil
 import qualified Data.Map.Strict as Map
 
 -- |Haupteinstiegspunkt, startet den Webserver.
@@ -49,6 +45,25 @@ main = do
       liftIO (atomically (StmBank.addBankAccount tVarBank newAccount))
       status status201
 
-    post "/name" $ do
-      -- name <- param "Name" -- Parameter aus dem Form
-      file "static/index.html"
+    post "/accounts/:id/withdraw" $ do
+      iban <- param "id"
+      amount <- param "amount"
+      liftIO (putStrLn "fdg")
+      -- adjust :: Ord k => (a -> a) -> k -> Map k a -> Map k a
+      -- modifyTVar :: TVar a -> (a -> a) -> STM ()
+      bank <- liftIO (readTVarIO tVarBank)
+      let maybeAccount = StmBank.findBankAccountById iban bank
+
+      maybe (status status404) (\acc -> do
+        liftIO (atomically (modifyBank tVarBank acc amount))
+        response <- liftIO (StmBank.toBankAccountResponse acc)
+        status status200
+        json (toJSON response)) maybeAccount
+
+
+
+modifyBank :: TVar StmBank.Bank -> StmBank.BankAccount -> String -> STM ()
+modifyBank tVarBank account amount = do
+  bank <- readTVar tVarBank
+  StmBank.withDraw account (read amount :: Int)
+  writeTVar tVarBank (StmBank.Bank (Map.adjust (\_ -> account) (StmBank.ibanNr account) (StmBank.accounts bank)))

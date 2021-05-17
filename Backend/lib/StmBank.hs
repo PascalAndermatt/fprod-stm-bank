@@ -5,9 +5,9 @@ Dieses Modul enthält Funktionen um...
 module StmBank 
 (
     getInitialAccounts, createInitialBank, findBankAccountById,
-    BankAccount, Bank, BankAccountResponse, toBankAccountResponse, 
-    createAccountFromTuple, accounts, BankAccountRequest, createAccountFromRequest,
-    addBankAccount
+    BankAccount, Bank (..), BankAccountResponse, toBankAccountResponse, 
+    createAccountFromTuple, accounts, ibanNr, BankAccountRequest, createAccountFromRequest,
+    addBankAccount, withDraw
 )
 where
 
@@ -60,9 +60,9 @@ createAccountFromRequest :: BankAccountRequest -> IO BankAccount
 createAccountFromRequest (BankAccountRequest owner bal) = createAccount owner bal
 
 createAccount :: String -> Int -> IO BankAccount
-createAccount name initBal = do
-  iban <- getIban name
-  atomically ((BankAccount iban name) <$> newTVar initBal)
+createAccount owner initBal = do
+  iban <- getIban owner
+  atomically ((BankAccount iban owner) <$> newTVar initBal)
 
 withDraw :: BankAccount -> Int -> STM ()
 withDraw (BankAccount _ _ tVarBal) amount = do
@@ -91,22 +91,17 @@ createInitialBank bankAccounts =  newTVarIO (Bank (Map.fromList (zip keys bankAc
           where keys = map ibanNr bankAccounts
 
 
--- getIban2 :: String -> String -> String
--- getIban2 nr owner = "CH" ++ nr ++ "00" ++ (map toUpper (take 3 owner))
-
 getIban :: String -> IO String
 getIban owner = do
   randomNum <- randomRIO (0,100)
   let hashVal = abs (hashWithSalt randomNum owner)
   pure ("CH" ++ (show hashVal)  ++ (map toUpper (take 3 owner)))
 
--- createInitialBankAccounts :: [BankAccount]
--- createInitialBankAccounts = [BankAccount "42" "Pascal" 1000, BankAccount "43" "Turan" 2000]
 
 showAccount :: BankAccount -> IO String
-showAccount (BankAccount iban owner bal) = do
-    balance <- readTVarIO bal
-    pure ("Bankaccount: id: " ++ iban ++ ", name: " ++ owner ++ ", balance: " ++ show balance)
+showAccount (BankAccount iban owner tVarbal) = do
+    bal <- readTVarIO tVarbal
+    pure ("Bankaccount: id: " ++ iban ++ ", name: " ++ owner ++ ", balance: " ++ show bal)
 
 
 showAllAccounts :: [BankAccount] -> IO ()
