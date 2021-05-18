@@ -8,11 +8,11 @@ module StmBank
     BankAccount, Bank (..), BankAccountResponse, toBankAccountResponse, 
     createAccountFromTriple, ibanNr, BankAccountRequest, createAccountFromRequest,
     addBankAccount, withDraw, deposit, BalanceUpdate, BankAccounts, TransferRequest,
-    transferFromRequest
+    transferFromRequest, StmResult (..), BankException (..)
 )
 where
 
-import Control.Monad ( replicateM_ )
+import Control.Monad ( replicateM_, when )
 import Control.Concurrent ( threadDelay, forkIO )
 import Control.Concurrent.STM
 import Data.Char
@@ -22,6 +22,7 @@ import qualified Data.Text.Lazy as T
 import           Data.Aeson.Types
 import qualified StmBank.Util as StmUtil
 import           Data.Hashable
+import           Control.Exception (Exception)
 
 -- type Map k v = Map.Map k v
 
@@ -32,6 +33,10 @@ data Bank                = Bank { accounts:: TVar BankAccounts}
 data BankAccountRequest  = BankAccountRequest {nameRequest:: String, balanceRequest:: Int }
 data TransferRequest     = TransferRequest {from :: String, to :: String, amount :: Int}
 type BalanceUpdate       = BankAccount -> Int -> STM ()
+data StmResult a         = Error String | Result a
+
+data BankException = NegativeAmount | AccountOverdrawn deriving Show
+instance Exception BankException
 
 
 instance ToJSON BankAccountResponse where
@@ -92,9 +97,12 @@ createAccount owner initBal randomSalt = do
 
 withDraw :: BankAccount -> Int -> STM ()
 withDraw (BankAccount _ _ tVarBal) amount = do
-    bal <- readTVar tVarBal
-    writeTVar tVarBal (bal - amount)
+        when (amount < 0) (throwSTM NegativeAmount)
+        bal <- readTVar tVarBal
+        when (amount > bal) (throwSTM AccountOverdrawn)
+        writeTVar tVarBal (bal - amount)
 
+        
 deposit :: BankAccount -> Int -> STM ()
 deposit bankAcc amount = do
     bal <- readTVar (balance bankAcc)

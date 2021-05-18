@@ -14,6 +14,7 @@ import           Control.Concurrent.STM
 import           Network.HTTP.Types
 import qualified Data.Map.Strict as Map
 import qualified StmBank.Util as StmUtil
+import           Control.Exception (Exception)
 
 -- |Haupteinstiegspunkt, startet den Webserver.
 main :: IO ()
@@ -56,9 +57,12 @@ main = do
       let maybeAccount = StmBank.findBankAccountById iban bankAccounts
 
       maybe (status status404) (\acc -> do
-        runStmActionAtomically (updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.withDraw)
-        response <- runStmActionAtomically (StmBank.toBankAccountResponse acc)
-        json (toJSON response)) maybeAccount
+        -- runStmActionAtomically (updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.deposit)
+          result <- runStmActionAtomically (getResultOfStmAction (updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.withDraw))
+          createResponse result (\res -> do
+            response <- runStmActionAtomically (StmBank.toBankAccountResponse res)
+            json (toJSON response))
+        ) maybeAccount
 
     post "/accounts/:id/deposit" $ do
       iban <- param "id"
@@ -70,9 +74,12 @@ main = do
       let maybeAccount = StmBank.findBankAccountById iban bankAccounts
 
       maybe (status status404) (\acc -> do
-        runStmActionAtomically (updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.deposit)
-        response <- runStmActionAtomically (StmBank.toBankAccountResponse acc)
-        json (toJSON response)) maybeAccount
+        -- runStmActionAtomically (updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.deposit)
+          result <- runStmActionAtomically (getResultOfStmAction (updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.deposit))
+          createResponse result (\res -> do
+            response <- runStmActionAtomically (StmBank.toBankAccountResponse res)
+            json (toJSON response))
+        ) maybeAccount
     
     post "/accounts/transfer" $ do
       transferRequest <- jsonData :: ActionM StmBank.TransferRequest
@@ -82,12 +89,31 @@ main = do
 
       runStmActionAtomically (StmBank.transferFromRequest transferRequest bankAccounts)
 
+    get "/test/error" $ do
+      status status500
+      json (StmUtil.stringToJson "Dies ist eine Test Fehlermeldung")
 
-updateBalanceOfAccountInBank :: TVar StmBank.BankAccounts -> StmBank.BankAccount -> Int -> StmBank.BalanceUpdate -> STM ()
+
+updateBalanceOfAccountInBank :: TVar StmBank.BankAccounts -> StmBank.BankAccount -> Int -> StmBank.BalanceUpdate -> STM (StmBank.StmResult StmBank.BankAccount)
 updateBalanceOfAccountInBank tVarBankAccounts acc amount f = do
   bankAccounts <- readTVar tVarBankAccounts
   f acc amount
   writeTVar tVarBankAccounts (Map.adjust (\_ -> acc) (StmBank.ibanNr acc) bankAccounts)
+  pure (StmBank.Result acc)
+
+
+-- catchSTM :: Exception e => STM a -> (e -> STM a) -> STM a
+getResultOfStmAction :: STM (StmBank.StmResult a) -> STM (StmBank.StmResult a)
+getResultOfStmAction stmA = catchSTM stmA handleException
+  where handleException (StmBank.NegativeAmount)   = pure (StmBank.Error "Fehler: Der Betrag muss grösser als 0 sein.")
+        handleException (StmBank.AccountOverdrawn) = pure (StmBank.Error "Fehler: Das Konto kann nicht überzogen werden")
+
+
+createResponse :: StmBank.StmResult a -> (a -> ActionM ()) -> ActionM ()
+createResponse (StmBank.Error message) _ = (do
+                                status status412
+                                json (StmUtil.stringToJson message))
+createResponse (StmBank.Result r) f = f r
 
 
 runStmActionAtomically :: STM a -> ActionM a
