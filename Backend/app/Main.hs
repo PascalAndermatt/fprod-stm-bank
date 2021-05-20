@@ -36,7 +36,7 @@ main = do
       accountId <- param "id"
       bankAccounts <- liftIO (readTVarIO (StmBank.accounts bank))
       let maybeAccount = StmBank.findBankAccountById accountId bankAccounts
-      maybe (status status404) (\acc -> do
+      withAccount (\acc -> do
         response <- runStmActionAtomically (StmBank.toBankAccountResponse acc)
         json (toJSON response)) maybeAccount
 
@@ -56,7 +56,7 @@ main = do
       bankAccounts <- liftIO (readTVarIO tVarBankAccounts)
       let maybeAccount = StmBank.findBankAccountById iban bankAccounts
 
-      maybe (status status404) (\acc -> do
+      withAccount (\acc -> do
         -- runStmActionAtomically (updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.deposit)
           result <- runStmActionAtomically (getResultOfStmAction (updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.withdraw))
           createResponse result (\res -> do
@@ -73,7 +73,7 @@ main = do
 
       let maybeAccount = StmBank.findBankAccountById iban bankAccounts
 
-      maybe (status status404) (\acc -> do
+      withAccount (\acc -> do
         -- runStmActionAtomically (updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.deposit)
           result <- runStmActionAtomically (getResultOfStmAction (updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.deposit))
           createResponse result (\res -> do
@@ -93,6 +93,9 @@ main = do
       status status500
       json (StmUtil.stringToJson "Dies ist eine Test Fehlermeldung")
 
+
+withAccount :: (StmBank.BankAccount -> ActionM()) -> Maybe StmBank.BankAccount -> ActionM ()
+withAccount = maybe (status status404)
 
 updateBalanceOfAccountInBank :: TVar StmBank.BankAccounts -> StmBank.BankAccount -> Int -> StmBank.BalanceUpdate -> STM (StmBank.StmResult StmBank.BankAccount)
 updateBalanceOfAccountInBank tVarBankAccounts acc amount f = do
