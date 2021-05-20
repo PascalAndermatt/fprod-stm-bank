@@ -7,7 +7,7 @@ module StmBank
     getInitialAccounts, createInitialBank, findBankAccountById,
     BankAccount, Bank (..), BankAccountResponse, toBankAccountResponse, 
     createAccountFromTriple, ibanNr, BankAccountRequest, createAccountFromRequest,
-    addBankAccount, withDraw, deposit, BalanceUpdate, BankAccounts, TransferRequest,
+    addBankAccount, withdraw, deposit, BalanceUpdate, BankAccounts, TransferRequest,
     transferFromRequest, StmResult (..), BankException (..)
 )
 where
@@ -95,8 +95,8 @@ createAccount owner initBal randomSalt = do
   let iban = createIban randomSalt owner 
   BankAccount iban owner <$> newTVar initBal
 
-withDraw :: BankAccount -> Int -> STM ()
-withDraw (BankAccount _ _ tVarBal) amount = do
+withdraw :: BankAccount -> Int -> STM ()
+withdraw (BankAccount _ _ tVarBal) amount = do
         when (amount < 0) (throwSTM NegativeAmount)
         bal <- readTVar tVarBal
         when (amount > bal) (throwSTM AccountOverdrawn)
@@ -110,7 +110,7 @@ deposit bankAcc amount = do
 
 transfer :: BankAccount -> BankAccount -> Int -> STM ()
 transfer accountA accountB amount = do
-    withDraw accountA amount
+    withdraw accountA amount
     deposit accountB amount
 
 

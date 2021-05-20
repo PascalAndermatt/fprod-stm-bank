@@ -58,7 +58,7 @@ main = do
 
       maybe (status status404) (\acc -> do
         -- runStmActionAtomically (updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.deposit)
-          result <- runStmActionAtomically (getResultOfStmAction (updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.withDraw))
+          result <- runStmActionAtomically (getResultOfStmAction (updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.withdraw))
           createResponse result (\res -> do
             response <- runStmActionAtomically (StmBank.toBankAccountResponse res)
             json (toJSON response))
