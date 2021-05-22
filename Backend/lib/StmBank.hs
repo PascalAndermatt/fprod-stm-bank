@@ -33,11 +33,11 @@ data BankAccount         = BankAccount { ibanNr :: String, name :: String, balan
 type BalanceUpdate       = BankAccount -> Int -> STM ()
 data StmResult a         = Error String | Result a
 
--- Exception
+-- Exception Types
 data BankException = NegativeAmount | AccountOverdrawn | AccountInactive | AccountBalanceNotZero deriving Show
 instance Exception BankException
 
--- REST DTO's (Request/Response)
+-- REST DTO's (Request/Response) Types
 data BankAccountResponse = BankAccountResponse { ibanNrR :: String, nameR :: String, balanceR :: Int, activeR :: Bool }
 data BankAccountRequest  = BankAccountRequest {nameRequest:: String, balanceRequest:: Int }
 data TransferRequest     = TransferRequest {from :: String, to :: String, amount :: Int}
@@ -61,18 +61,12 @@ instance FromJSON TransferRequest where
                             v .: "to"   <*>
                             v .: "amount"
 
-
 -- Methods
 toBankAccountResponse :: BankAccount -> STM BankAccountResponse
 toBankAccountResponse (BankAccount i n b a) = do
                       bal <- readTVar b
                       active <- readTVar a
                       pure (BankAccountResponse i n bal active)
-
--- transferFromRequest :: BankAccount -> BankAccount -> STM (StmResult ())
--- transferFromRequest (TransferRequest from to amount) bankAccounts = do
---             maybe (pure ()) (\(f,t) -> transfer f t amount) (maybeAccountsForTransfer from to bankAccounts)
-
 
 maybeAccountsForTransfer :: TransferRequest -> BankAccounts -> Maybe (BankAccount, BankAccount)
 maybeAccountsForTransfer (TransferRequest ibanFrom ibanTo _) bankAccounts = do
@@ -128,12 +122,10 @@ transfer accountA accountB amount = do
     deposit accountB amount
     pure (Result ())
 
-
 addBankAccount :: TVar BankAccounts -> BankAccount -> STM ()
 addBankAccount tVarBankAccounts newAccount = do
     bankAccounts <- readTVar tVarBankAccounts
     writeTVar tVarBankAccounts (Map.insert (ibanNr newAccount) newAccount bankAccounts)
-
 
 createInitialBank :: [BankAccount] -> STM Bank
 createInitialBank bankAccounts =  do
@@ -141,11 +133,9 @@ createInitialBank bankAccounts =  do
                         pure (Bank tVarBankAccounts)
                         where keys = map ibanNr bankAccounts
 
-
 createIban :: Int -> String -> String
 createIban randomNumber owner = "CH" ++ (show hashVal) ++ (map toUpper (take 3 owner))
                             where hashVal = abs (hashWithSalt randomNumber owner)
-
 
 updateBalanceOfAccountInBank :: TVar BankAccounts -> BankAccount -> Int -> BalanceUpdate -> STM (StmResult BankAccount)
 updateBalanceOfAccountInBank tVarBankAccounts acc amount f = do
@@ -153,7 +143,6 @@ updateBalanceOfAccountInBank tVarBankAccounts acc amount f = do
   f acc amount
   writeTVar tVarBankAccounts (Map.adjust (\_ -> acc) (ibanNr acc) bankAccounts)
   pure (Result acc)
-
 
 updateStatusOfAccountInBank :: TVar BankAccounts -> BankAccount -> Bool -> STM (StmResult BankAccount)
 updateStatusOfAccountInBank tVarBankAccounts acc newActive = do
@@ -165,8 +154,6 @@ updateStatusOfAccountInBank tVarBankAccounts acc newActive = do
     pure (Result acc)
 
 
-
-
 -- catchSTM :: Exception e => STM a -> (e -> STM a) -> STM a
 getResultOfStmAction :: STM (StmResult a) -> STM (StmResult a)
 getResultOfStmAction stmA = catchSTM stmA handleException
@@ -175,17 +162,13 @@ getResultOfStmAction stmA = catchSTM stmA handleException
         handleException (AccountInactive)        = pure (Error "Fehler: Das Konto ist inaktiv")
         handleException (AccountBalanceNotZero)  = pure (Error "Fehler: Der Betrag auf dem Konto ist nicht 0")
 
-
 showAccount :: BankAccount -> IO String -- evtl. STM Action
 showAccount (BankAccount iban owner tVarbal tVarActive) = do
     bal <- readTVarIO tVarbal
     isActive <- readTVarIO tVarActive
     pure ("Bankaccount: id: " ++ iban ++ ", name: " ++ owner ++ ", balance: " ++ show bal ++ ", active: " ++ show isActive)
 
-
 showAllAccounts :: [BankAccount] -> IO ()
 showAllAccounts accs = do
     accountsAsText <- mapM showAccount accs
     mapM_ putStrLn accountsAsText
-
-

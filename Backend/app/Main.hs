@@ -82,8 +82,7 @@ main = do
       transferRequest <- jsonData :: ActionM StmBank.TransferRequest
       let amount = StmBank.amount transferRequest
 
-      let tVarBankAccounts = (StmBank.accounts bank)
-      bankAccounts <- liftIO (readTVarIO tVarBankAccounts)
+      bankAccounts <- liftIO (readTVarIO (StmBank.accounts bank))
 
       maybe (status status404) (\(from,to) -> do
           result <- runStmActionAtomically (StmBank.getResultOfStmAction (StmBank.transfer from to amount))
@@ -117,7 +116,6 @@ createResponse (StmBank.Error message) _ = (do
                                 status status412
                                 json (StmUtil.stringToJson message))
 createResponse (StmBank.Result r) f = f r
-
 
 runStmActionAtomically :: STM a -> ActionM a
 runStmActionAtomically stmAction = liftIO (atomically stmAction)
