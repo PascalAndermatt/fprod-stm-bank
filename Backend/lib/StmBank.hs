@@ -8,7 +8,8 @@ module StmBank
     BankAccount, Bank (..), BankAccountResponse, toBankAccountResponse, 
     createAccountFromTriple, ibanNr, BankAccountRequest, createAccountFromRequest,
     addBankAccount, withdraw, deposit, BalanceUpdate, BankAccounts, TransferRequest,
-    transferFromRequest, StmResult (..), BankException (..)
+    transferFromRequest, StmResult (..), BankException (..), updateBalanceOfAccountInBank,
+    getResultOfStmAction
 )
 where
 
@@ -19,7 +20,7 @@ import Data.Char
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Text.Lazy as T
-import           Data.Aeson.Types
+import           Data.Aeson.Types hiding (Error)
 import qualified StmBank.Util as StmUtil
 import           Data.Hashable
 import           Control.Exception (Exception)
@@ -130,6 +131,21 @@ createInitialBank bankAccounts =  do
 createIban :: Int -> String -> String
 createIban randomNumber owner = "CH" ++ (show hashVal) ++ (map toUpper (take 3 owner))
                             where hashVal = abs (hashWithSalt randomNumber owner)
+
+
+updateBalanceOfAccountInBank :: TVar BankAccounts -> BankAccount -> Int -> BalanceUpdate -> STM (StmResult BankAccount)
+updateBalanceOfAccountInBank tVarBankAccounts acc amount f = do
+  bankAccounts <- readTVar tVarBankAccounts
+  f acc amount
+  writeTVar tVarBankAccounts (Map.adjust (\_ -> acc) (ibanNr acc) bankAccounts)
+  pure (Result acc)
+
+
+-- catchSTM :: Exception e => STM a -> (e -> STM a) -> STM a
+getResultOfStmAction :: STM (StmResult a) -> STM (StmResult a)
+getResultOfStmAction stmA = catchSTM stmA handleException
+  where handleException (NegativeAmount)   = pure (Error "Fehler: Der Betrag muss grösser als 0 sein.")
+        handleException (AccountOverdrawn) = pure (Error "Fehler: Das Konto kann nicht überzogen werden")
 
 
 showAccount :: BankAccount -> IO String -- evtl. STM Action

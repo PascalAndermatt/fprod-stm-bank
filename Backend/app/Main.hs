@@ -58,7 +58,7 @@ main = do
 
       withAccount (\acc -> do
         -- runStmActionAtomically (updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.deposit)
-          result <- runStmActionAtomically (getResultOfStmAction (updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.withdraw))
+          result <- runStmActionAtomically (StmBank.getResultOfStmAction (StmBank.updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.withdraw))
           createResponse result (\res -> do
             response <- runStmActionAtomically (StmBank.toBankAccountResponse res)
             json (toJSON response))
@@ -75,7 +75,7 @@ main = do
 
       withAccount (\acc -> do
         -- runStmActionAtomically (updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.deposit)
-          result <- runStmActionAtomically (getResultOfStmAction (updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.deposit))
+          result <- runStmActionAtomically (StmBank.getResultOfStmAction (StmBank.updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.deposit))
           createResponse result (\res -> do
             response <- runStmActionAtomically (StmBank.toBankAccountResponse res)
             json (toJSON response))
@@ -89,6 +89,11 @@ main = do
 
       runStmActionAtomically (StmBank.transferFromRequest transferRequest bankAccounts)
 
+    post "/accounts/close/:id" $ do
+      iban <- param "id"
+      liftIO (putStr iban)
+      status status200
+
     get "/test/error" $ do
       status status500
       json (StmUtil.stringToJson "Dies ist eine Test Fehlermeldung")
@@ -96,21 +101,6 @@ main = do
 
 withAccount :: (StmBank.BankAccount -> ActionM()) -> Maybe StmBank.BankAccount -> ActionM ()
 withAccount = maybe (status status404)
-
-updateBalanceOfAccountInBank :: TVar StmBank.BankAccounts -> StmBank.BankAccount -> Int -> StmBank.BalanceUpdate -> STM (StmBank.StmResult StmBank.BankAccount)
-updateBalanceOfAccountInBank tVarBankAccounts acc amount f = do
-  bankAccounts <- readTVar tVarBankAccounts
-  f acc amount
-  writeTVar tVarBankAccounts (Map.adjust (\_ -> acc) (StmBank.ibanNr acc) bankAccounts)
-  pure (StmBank.Result acc)
-
-
--- catchSTM :: Exception e => STM a -> (e -> STM a) -> STM a
-getResultOfStmAction :: STM (StmBank.StmResult a) -> STM (StmBank.StmResult a)
-getResultOfStmAction stmA = catchSTM stmA handleException
-  where handleException (StmBank.NegativeAmount)   = pure (StmBank.Error "Fehler: Der Betrag muss grösser als 0 sein.")
-        handleException (StmBank.AccountOverdrawn) = pure (StmBank.Error "Fehler: Das Konto kann nicht überzogen werden")
-
 
 createResponse :: StmBank.StmResult a -> (a -> ActionM ()) -> ActionM ()
 createResponse (StmBank.Error message) _ = (do
