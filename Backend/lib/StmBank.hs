@@ -7,9 +7,9 @@ module StmBank
     getInitialAccounts, createInitialBank, findBankAccountById,
     BankAccount, Bank (..), BankAccountResponse, toBankAccountResponse, 
     createAccountFromTriple, ibanNr, BankAccountRequest, createAccountFromRequest,
-    addBankAccount, withdraw, deposit, BalanceUpdate, BankAccounts, TransferRequest,
-    transferFromRequest, StmResult (..), BankException (..), updateBalanceOfAccountInBank,
-    getResultOfStmAction, updateStatusOfAccountInBank
+    addBankAccount, withdraw, deposit, BalanceUpdate, BankAccounts, TransferRequest (..),
+    maybeAccountsForTransfer, StmResult (..), BankException (..), updateBalanceOfAccountInBank,
+    getResultOfStmAction, updateStatusOfAccountInBank, transfer
 )
 where
 
@@ -69,13 +69,13 @@ toBankAccountResponse (BankAccount i n b a) = do
                       active <- readTVar a
                       pure (BankAccountResponse i n bal active)
 
-transferFromRequest :: TransferRequest -> BankAccounts -> STM ()
-transferFromRequest (TransferRequest from to amount) bankAccounts = do
-            maybe (pure ()) (\(f,t) -> transfer f t amount) (maybeAccountsForTransfer from to bankAccounts)
+-- transferFromRequest :: BankAccount -> BankAccount -> STM (StmResult ())
+-- transferFromRequest (TransferRequest from to amount) bankAccounts = do
+--             maybe (pure ()) (\(f,t) -> transfer f t amount) (maybeAccountsForTransfer from to bankAccounts)
 
 
-maybeAccountsForTransfer :: String -> String -> BankAccounts -> Maybe (BankAccount, BankAccount)
-maybeAccountsForTransfer ibanFrom ibanTo bankAccounts = do
+maybeAccountsForTransfer :: TransferRequest -> BankAccounts -> Maybe (BankAccount, BankAccount)
+maybeAccountsForTransfer (TransferRequest ibanFrom ibanTo _) bankAccounts = do
         from <- findBankAccountById ibanFrom bankAccounts
         to   <- findBankAccountById ibanTo bankAccounts
         return (from,to)
@@ -122,10 +122,11 @@ deposit bankAcc amount = do
     bal <- readTVar (balance bankAcc)
     writeTVar (balance bankAcc) (bal + amount)
 
-transfer :: BankAccount -> BankAccount -> Int -> STM ()
+transfer :: BankAccount -> BankAccount -> Int -> STM (StmResult ())
 transfer accountA accountB amount = do
     withdraw accountA amount
     deposit accountB amount
+    pure (Result ())
 
 
 addBankAccount :: TVar BankAccounts -> BankAccount -> STM ()

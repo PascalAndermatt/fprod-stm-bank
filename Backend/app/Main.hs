@@ -14,7 +14,6 @@ import           Control.Concurrent.STM
 import           Network.HTTP.Types
 import qualified Data.Map.Strict as Map
 import qualified StmBank.Util as StmUtil
-import           Control.Exception (Exception)
 
 -- |Haupteinstiegspunkt, startet den Webserver.
 main :: IO ()
@@ -57,7 +56,6 @@ main = do
       let maybeAccount = StmBank.findBankAccountById iban bankAccounts
 
       withAccount (\acc -> do
-        -- runStmActionAtomically (updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.deposit)
           result <- runStmActionAtomically (StmBank.getResultOfStmAction (StmBank.updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.withdraw))
           createResponse result (\res -> do
             response <- runStmActionAtomically (StmBank.toBankAccountResponse res)
@@ -74,7 +72,6 @@ main = do
       let maybeAccount = StmBank.findBankAccountById iban bankAccounts
 
       withAccount (\acc -> do
-        -- runStmActionAtomically (updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.deposit)
           result <- runStmActionAtomically (StmBank.getResultOfStmAction (StmBank.updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.deposit))
           createResponse result (\res -> do
             response <- runStmActionAtomically (StmBank.toBankAccountResponse res)
@@ -83,11 +80,15 @@ main = do
     
     post "/accounts/transfer" $ do
       transferRequest <- jsonData :: ActionM StmBank.TransferRequest
+      let amount = StmBank.amount transferRequest
 
       let tVarBankAccounts = (StmBank.accounts bank)
       bankAccounts <- liftIO (readTVarIO tVarBankAccounts)
 
-      runStmActionAtomically (StmBank.transferFromRequest transferRequest bankAccounts)
+      maybe (status status404) (\(from,to) -> do
+          result <- runStmActionAtomically (StmBank.getResultOfStmAction (StmBank.transfer from to amount))
+          createResponse result (\_ -> status status200)
+        )(StmBank.maybeAccountsForTransfer transferRequest bankAccounts)
 
     post "/accounts/close/:id" $ do
       iban <- param "id"
