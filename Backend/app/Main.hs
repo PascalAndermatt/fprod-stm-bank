@@ -91,8 +91,17 @@ main = do
 
     post "/accounts/close/:id" $ do
       iban <- param "id"
-      liftIO (putStr iban)
-      status status200
+
+      let tVarBankAccounts = (StmBank.accounts bank)
+      bankAccounts <- liftIO (readTVarIO tVarBankAccounts)
+      let maybeAccount = StmBank.findBankAccountById iban bankAccounts
+
+      withAccount (\acc -> do
+          result <- runStmActionAtomically ( StmBank.getResultOfStmAction (StmBank.updateStatusOfAccountInBank tVarBankAccounts acc False))
+          createResponse result (\res -> do
+            response <- runStmActionAtomically (StmBank.toBankAccountResponse res)
+            json (toJSON response))
+        ) maybeAccount
 
     get "/test/error" $ do
       status status500

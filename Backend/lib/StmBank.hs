@@ -9,7 +9,7 @@ module StmBank
     createAccountFromTriple, ibanNr, BankAccountRequest, createAccountFromRequest,
     addBankAccount, withdraw, deposit, BalanceUpdate, BankAccounts, TransferRequest,
     transferFromRequest, StmResult (..), BankException (..), updateBalanceOfAccountInBank,
-    getResultOfStmAction
+    getResultOfStmAction, updateStatusOfAccountInBank
 )
 where
 
@@ -25,32 +25,30 @@ import qualified StmBank.Util as StmUtil
 import           Data.Hashable
 import           Control.Exception (Exception)
 
--- type Map k v = Map.Map k v
-
-data BankAccount         = BankAccount { ibanNr :: String, name :: String, balance :: TVar Int }
-data BankAccountResponse = BankAccountResponse { ibanNrR :: String, nameR :: String, balanceR :: Int }
-type BankAccounts        = Map String BankAccount
+-- Bank Data Types
 data Bank                = Bank { accounts:: TVar BankAccounts}
-data BankAccountRequest  = BankAccountRequest {nameRequest:: String, balanceRequest:: Int }
-data TransferRequest     = TransferRequest {from :: String, to :: String, amount :: Int}
+type BankAccounts        = Map String BankAccount
+data BankAccount         = BankAccount { ibanNr :: String, name :: String, balance :: TVar Int, active :: TVar Bool }
+
 type BalanceUpdate       = BankAccount -> Int -> STM ()
 data StmResult a         = Error String | Result a
 
-data BankException = NegativeAmount | AccountOverdrawn deriving Show
+-- Exception
+data BankException = NegativeAmount | AccountOverdrawn | AccountInactive | AccountBalanceNotZero deriving Show
 instance Exception BankException
 
+-- REST DTO's (Request/Response)
+data BankAccountResponse = BankAccountResponse { ibanNrR :: String, nameR :: String, balanceR :: Int, activeR :: Bool }
+data BankAccountRequest  = BankAccountRequest {nameRequest:: String, balanceRequest:: Int }
+data TransferRequest     = TransferRequest {from :: String, to :: String, amount :: Int}
 
+-- JSON converters
 instance ToJSON BankAccountResponse where
-  toJSON (BankAccountResponse iban owner bal) = object [
-    "ibanNr" .= (StmUtil.stringToJson iban), 
-    "owner" .= (StmUtil.stringToJson owner), 
-    "balance" .= (toJSON bal)]
-
-
-toBankAccountResponse :: BankAccount -> STM BankAccountResponse
-toBankAccountResponse (BankAccount i n b) = do
-                      bal <- readTVar b
-                      pure (BankAccountResponse i n bal)
+  toJSON (BankAccountResponse iban owner bal active) = object [
+    "ibanNr"    .= (StmUtil.stringToJson iban), 
+    "owner"     .= (StmUtil.stringToJson owner), 
+    "balance"   .= (toJSON bal),
+    "active"    .= (toJSON active)]
 
 instance FromJSON BankAccountRequest where
       parseJSON (Object v) = BankAccountRequest <$>
@@ -63,6 +61,13 @@ instance FromJSON TransferRequest where
                             v .: "to"   <*>
                             v .: "amount"
 
+
+-- Methods
+toBankAccountResponse :: BankAccount -> STM BankAccountResponse
+toBankAccountResponse (BankAccount i n b a) = do
+                      bal <- readTVar b
+                      active <- readTVar a
+                      pure (BankAccountResponse i n bal active)
 
 transferFromRequest :: TransferRequest -> BankAccounts -> STM ()
 transferFromRequest (TransferRequest from to amount) bankAccounts = do
@@ -91,21 +96,29 @@ createAccountFromTriple (owner, initBal, randomSalt) = createAccount owner initB
 createAccountFromRequest :: BankAccountRequest -> Int -> STM BankAccount
 createAccountFromRequest (BankAccountRequest owner bal) = createAccount owner bal
 
+-- can throw an Exception
 createAccount :: String -> Int -> Int -> STM BankAccount
 createAccount owner initBal randomSalt = do
+  when (initBal < 0) (throwSTM NegativeAmount)
   let iban = createIban randomSalt owner 
-  BankAccount iban owner <$> newTVar initBal
+  BankAccount iban owner <$> newTVar initBal <*> newTVar True
 
+-- can throw an Exception
 withdraw :: BankAccount -> Int -> STM ()
-withdraw (BankAccount _ _ tVarBal) amount = do
+withdraw (BankAccount _ _ tVarBal a) amount = do
         when (amount < 0) (throwSTM NegativeAmount)
+        isActive <- readTVar a
+        when (not isActive) (throwSTM AccountInactive)
         bal <- readTVar tVarBal
         when (amount > bal) (throwSTM AccountOverdrawn)
         writeTVar tVarBal (bal - amount)
 
-        
+-- can throw an Exception
 deposit :: BankAccount -> Int -> STM ()
 deposit bankAcc amount = do
+    when (amount < 0) (throwSTM NegativeAmount)
+    isActive <- readTVar (active bankAcc)
+    when (not isActive) (throwSTM AccountInactive)
     bal <- readTVar (balance bankAcc)
     writeTVar (balance bankAcc) (bal + amount)
 
@@ -141,17 +154,32 @@ updateBalanceOfAccountInBank tVarBankAccounts acc amount f = do
   pure (Result acc)
 
 
+updateStatusOfAccountInBank :: TVar BankAccounts -> BankAccount -> Bool -> STM (StmResult BankAccount)
+updateStatusOfAccountInBank tVarBankAccounts acc newActive = do
+    bankAccounts <- readTVar tVarBankAccounts
+    bal <- readTVar (balance acc)
+    when (not newActive && bal /= 0) (throwSTM AccountBalanceNotZero)
+    writeTVar (active acc) newActive
+    writeTVar tVarBankAccounts (Map.adjust (\_ -> acc) (ibanNr acc) bankAccounts)
+    pure (Result acc)
+
+
+
+
 -- catchSTM :: Exception e => STM a -> (e -> STM a) -> STM a
 getResultOfStmAction :: STM (StmResult a) -> STM (StmResult a)
 getResultOfStmAction stmA = catchSTM stmA handleException
-  where handleException (NegativeAmount)   = pure (Error "Fehler: Der Betrag muss grösser als 0 sein.")
-        handleException (AccountOverdrawn) = pure (Error "Fehler: Das Konto kann nicht überzogen werden")
+  where handleException (NegativeAmount)         = pure (Error "Fehler: Der Betrag muss grösser als 0 sein.")
+        handleException (AccountOverdrawn)       = pure (Error "Fehler: Das Konto kann nicht überzogen werden")
+        handleException (AccountInactive)        = pure (Error "Fehler: Das Konto ist inaktiv")
+        handleException (AccountBalanceNotZero)  = pure (Error "Fehler: Der Betrag auf dem Konto ist nicht 0")
 
 
 showAccount :: BankAccount -> IO String -- evtl. STM Action
-showAccount (BankAccount iban owner tVarbal) = do
+showAccount (BankAccount iban owner tVarbal tVarActive) = do
     bal <- readTVarIO tVarbal
-    pure ("Bankaccount: id: " ++ iban ++ ", name: " ++ owner ++ ", balance: " ++ show bal)
+    isActive <- readTVarIO tVarActive
+    pure ("Bankaccount: id: " ++ iban ++ ", name: " ++ owner ++ ", balance: " ++ show bal ++ ", active: " ++ show isActive)
 
 
 showAllAccounts :: [BankAccount] -> IO ()
