@@ -21,6 +21,7 @@ common common-properties
    ,aeson ==1.4.7.1
    ,http-types
    ,random ==1.2.0
+   ,wai-cors ==0.2.7
   ghc-options:
     -Wall
 
