@@ -47,7 +47,6 @@ main =
     , subscriptions = \_ -> Sub.none
     }
 
-
 type alias Model =
   { bankAccounts : List BankAccount
   }
@@ -56,21 +55,17 @@ init : ( Model, Cmd Msg )
 init =
   ( { bankAccounts = []}, Cmd.none )
 
-type Msg
-  -- TODO add a second Msg constructor for the result returned by getBitcoinPrice
-  = GetAllBankAccounts | BankAccountsResult (Result Http.Error (List BankAccount))
+type Msg = GetAllBankAccounts | BankAccountsResult (Result Http.Error (List BankAccount))
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
   case msg of
-    -- TODO1: Execute the API request when the button is pressed
     GetAllBankAccounts ->
       ( model, getAllBankAccounts )
     BankAccountsResult result  -> case result of
        Ok listWithAccounts -> ({model | bankAccounts = listWithAccounts}, Cmd.none)
        Err httpError -> ({model | bankAccounts = []}, Cmd.none )
-    -- TODO2: Handle the result of the API request
 
 getAllBankAccounts : Cmd Msg
 getAllBankAccounts = Http.get 
