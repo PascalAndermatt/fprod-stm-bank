@@ -23,6 +23,6 @@ cabal.project.local~
 .ghc.environment.*
 .DS_Store
 
-elm-stuff
-node_modules
+elm-stuff/
+node_modules/
 package-lock.json
