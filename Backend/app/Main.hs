@@ -14,7 +14,8 @@ import           Control.Concurrent.STM
 import           Network.HTTP.Types
 import qualified Data.Map.Strict as Map
 import qualified StmBank.Util as StmUtil
-import Network.Wai.Middleware.Cors
+import qualified StmBank.Cors as CorsUtil
+
 
 -- |Haupteinstiegspunkt, startet den Webserver.
 main :: IO ()
@@ -24,7 +25,7 @@ main = do
   
   scotty 4000 $ do
     middleware logStdoutDev
-    middleware simpleCors
+    middleware CorsUtil.corsified
 
     get "/" $ file "static/index.html"
 

@@ -22,12 +22,13 @@ common common-properties
    ,http-types
    ,random ==1.2.0
    ,wai-cors ==0.2.7
+   ,wai ==3.2.3
   ghc-options:
     -Wall
 
 library
   import: common-properties
-  exposed-modules:     StmBank, StmBank.Util
+  exposed-modules:     StmBank, StmBank.Util, StmBank.Cors
   -- other-modules:
   -- other-extensions:
   build-depends:       
