@@ -11,6 +11,32 @@ import Json.Encode
 import Json.Decode exposing (field)
 import Html.Events exposing (onInput)
 import Http
+import Http
+import Http exposing (expectWhatever)
+import Http
+import Platform.Cmd exposing (Cmd)
+import Http
+import Http
+
+type alias TransferRequest =
+    { from : String
+    , to : String
+    , amount : Int
+    }
+
+decodeTransferRequest : Json.Decode.Decoder TransferRequest
+decodeTransferRequest =
+    Json.Decode.map3 TransferRequest
+        (field "from" Json.Decode.string)
+        (field "to" Json.Decode.string)
+        (field "amount" Json.Decode.int)
+
+encodeTransferRequest : TransferRequest -> Json.Encode.Value
+encodeTransferRequest record =
+    Json.Encode.object
+        [ ("from",  Json.Encode.string <| record.from)
+        , ("to",  Json.Encode.string <| record.to)
+        , ("amount",  Json.Encode.int <| record.amount)]
 
 type alias BankAccountRequest =
     { owner : String
@@ -70,33 +96,71 @@ main =
 type alias Model =
   { bankAccounts : List BankAccount,
     newOwner : String,
-    newBalance : Int
+    newBalance : Int,
+    ibanForUpdate : String,
+    balanceForUpdate : Int,
+    updateMethod : String,
+    ibanFrom : String,
+    ibanTo : String,
+    amountForTransfer : Int
   }
 
 init : ( Model, Cmd Msg )
 init =
-  ( { bankAccounts = [], newOwner = "", newBalance = 0}, Cmd.none )
+  ( { bankAccounts = [], 
+      newOwner = "", 
+      newBalance = 0,
+      ibanForUpdate = "",
+      balanceForUpdate = 0,
+      updateMethod = "",
+      ibanFrom = "",
+      ibanTo = "",
+      amountForTransfer = 0}, Cmd.none )
 
 type Msg = GetAllBankAccounts | 
            BankAccountsResult (Result Http.Error (List BankAccount)) | 
            SetOwner String | 
            SetBalance Int |
            CreateBankAccount |
-           CreateBankAccountResult (Result Http.Error ())
+           CreateBankAccountResult (Result Http.Error ()) |
+           SetIbanForUpdate String |
+           SetBalanceForUpdate Int |
+           SetUpdateMethod String |
+           UpdateBalance |
+           UpdateBalanceResult (Result Http.Error BankAccount) |
+           SetIbanFrom String |
+           SetIbanTo String |
+           SetAmountForTransfer Int |
+           Transfer |
+           TransferResult (Result Http.Error ())
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
   case msg of
+    SetIbanForUpdate iban -> ({model | ibanForUpdate = iban}, Cmd.none)
+    SetBalanceForUpdate bal -> ({model | balanceForUpdate = bal}, Cmd.none)
     SetOwner owner -> ({model | newOwner = owner}, Cmd.none)
     SetBalance bal -> ({model | newBalance = bal}, Cmd.none)
+    SetUpdateMethod str -> ({model | updateMethod = str}, Cmd.none)
     CreateBankAccount -> (model, createBankAccount model)
+    UpdateBalance -> (model, updateBalance model)
     GetAllBankAccounts ->
       ( model, getAllBankAccounts )
     BankAccountsResult result  -> case result of
        Ok listWithAccounts -> ({model | bankAccounts = listWithAccounts}, Cmd.none)
        Err httpError -> ({model | bankAccounts = []}, Cmd.none )
     CreateBankAccountResult result -> case result of
+       Ok _ -> (model, Cmd.none)
+       Err httpError -> (model, Cmd.none)
+    UpdateBalanceResult result -> case result of
+       Ok _ -> (model, Cmd.none)
+       Err httpError -> (model, Cmd.none)
+    SetIbanTo to -> ({model | ibanTo = to}, Cmd.none)
+    SetIbanFrom from -> ({model | ibanFrom = from}, Cmd.none)
+    SetAmountForTransfer amount -> ({model | amountForTransfer = amount}, Cmd.none)
+    Transfer -> (model, transfer model)
+    TransferResult result -> case result of
        Ok _ -> (model, Cmd.none)
        Err httpError -> (model, Cmd.none)
 
@@ -113,8 +177,24 @@ createBankAccount model = Http.post
                           expect = Http.expectWhatever CreateBankAccountResult
                         }
 
+updateBalance : Model -> Cmd Msg
+updateBalance model = Http.post
+                      {
+                        url = "http://localhost:4000/accounts/" ++ model.ibanForUpdate ++ "/" ++ String.toLower model.updateMethod ++ "?amount=" ++ (String.fromInt model.balanceForUpdate),
+                        body = Http.emptyBody,
+                        expect = Http.expectJson UpdateBalanceResult decodeBankAccount
+                      }
+
+transfer : Model -> Cmd Msg
+transfer model = Http.post
+                  {
+                    url = "http://localhost:4000/accounts/transfer",
+                    body = Http.jsonBody (encodeTransferRequest {from = model.ibanFrom, to = model.ibanTo, amount = model.amountForTransfer}),
+                    expect = Http.expectWhatever TransferResult
+                  }
+
 view : Model -> Html Msg
-view model = div [] [
+view model = div [class "mb-5"] [
     createNavBar,
     div [ class "container" ]
       [ 
@@ -130,24 +210,72 @@ view model = div [] [
           ],
           tbody [] (List.map createTableRowFromBankAccount model.bankAccounts)
         ],
-        button [ type_ "button", class "btn btn-primary", onClick GetAllBankAccounts ] [ text "get all accounts" ]
+        button [ type_ "button", class "btn haskell-btn", onClick GetAllBankAccounts ] [ text "get all accounts" ]
       ],
-      newAccountView
+      newAccountView,
+      updateBalanceView,
+      transferView
   ]
   
 newAccountView : Html Msg
 newAccountView = div [class "container mt-5"] [
     h3 [] [text "create new Bankaccount"],
-    div [] [
-      label [for "owner-input", class "form-label"] [text "Owner"],
-      input [type_ "text", class "form-control", id "owner-input", placeholder "Peter", onInput SetOwner] []
-    ],
-    div [class "mb-4"] [
-      label [for "balance-input", class "form-label"] [text "Balance"],
-      input [type_ "text", class "form-control", id "balance-input", placeholder "1000", onInput (\str -> SetBalance (Maybe.withDefault 0 (String.toInt str)))] []
-    ],
-    button [ type_ "button", class "btn btn-primary", onClick CreateBankAccount] [ text "create" ]
+    haskellBorder [
+      div [] [
+        label [for "owner-input", class "form-label"] [text "Owner"],
+        input [type_ "text", class "form-control", id "owner-input", placeholder "Peter", onInput SetOwner] []
+      ],
+      div [class "mb-4"] [
+        label [for "balance-input", class "form-label"] [text "Balance"],
+        input [type_ "text", class "form-control", id "balance-input", placeholder "1000", onInput (\str -> SetBalance (Maybe.withDefault 0 (String.toInt str)))] []
+      ],
+      button [ type_ "button", class "btn haskell-btn", onClick CreateBankAccount] [ text "create" ]
+    ]
   ]
+
+updateBalanceView : Html Msg
+updateBalanceView = div [class "container mt-5"] [
+    h3 [] [text "update balance of Bankaccount"],
+    haskellBorder [
+      div [] [
+        label [for "iban-input", class "form-label"] [text "IBAN"],
+        input [type_ "text", class "form-control", id "iban-input", placeholder "CH2707888954202552370TUR", onInput SetIbanForUpdate] []
+      ],
+      div [class "mb-4"] [
+        label [for "balance-input", class "form-label"] [text "Balance"],
+        input [type_ "text", class "form-control", id "balance-input", placeholder "1000", onInput (\str -> SetBalanceForUpdate (Maybe.withDefault 0 (String.toInt str)))] []
+      ],
+      select [class "form-select mb-4", onInput SetUpdateMethod] [
+        option [selected True ] [text "choose update action"],
+        option [value "withdraw"] [text "withdraw"],
+        option [value "deposit"] [text "deposit"]
+      ],
+      button [ type_ "button", class "btn haskell-btn", onClick UpdateBalance] [ text "update balance" ]
+    ]
+  ]
+
+transferView : Html Msg
+transferView = div [class "container mt-5"] [
+    h3 [] [text "transfer"],
+    haskellBorder [
+      div [] [
+        label [for "from-input", class "form-label"] [text "from"],
+        input [type_ "text", class "form-control", id "from-input", placeholder "CH2707888954202552370TUR", onInput SetIbanFrom] []
+      ],
+      div [] [
+        label [for "to-input", class "form-label"] [text "to"],
+        input [type_ "text", class "form-control", id "to-input", placeholder "CH2707888954202552370TUR", onInput SetIbanTo] []
+      ],
+      div [class "mb-4"] [
+        label [for "amount-transfer-input", class "form-label"] [text "amount"],
+        input [type_ "text", class "form-control", id "amount-transfer-input", placeholder "1000", onInput (\str -> SetAmountForTransfer (Maybe.withDefault 0 (String.toInt str)))] []
+      ],
+      button [ type_ "button", class "btn haskell-btn", onClick Transfer] [ text "transfer" ]
+    ]
+  ]
+
+haskellBorder : List (Html Msg) -> Html Msg
+haskellBorder content = div [class "haskell-border p-4"] content
 
 getAccountStatus : BankAccount -> String
 getAccountStatus acc = if acc.active then "active" else "inactive"
@@ -168,7 +296,14 @@ createNavBar = div [class "mb-4", style "background-color" "#5E5184", style "hei
             div [class "col-1 p-3"] [
                 img [src "/src/assets/haskell.png", width 50, height 50] []
             ],
-            h1 [class "col-3 p-3"] [text "STM Bank"]
+            h1 [class "col-3 p-3"] [text "STM Bank"],
+            div [class "col-8 container"] [
+              div [class "row justify-content-end"] [
+                h6 [class "col-12 align-self-end"] [text "Authors:"],
+                h6 [class "col-12 align-self-end"] [text "Pascal Andermatt"],
+                h6 [class "col-12 align-self-end"] [text "Turan Ledermann"]
+              ]
+            ]
             
           ]
       ]
