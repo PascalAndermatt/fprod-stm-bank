@@ -75,24 +75,30 @@ getAllBankAccounts = Http.get
 
 view : Model -> Html Msg
 view model =
-  div [ class "container text-center jumbotron" ]
-    -- Responsive fixed width container
+  div [ class "container" ]
     [ 
-      button [ type_ "button", class "btn btn-primary", onClick GetAllBankAccounts ] [ text "get all accounts" ],
-      (viewMainContent model)
+      h1 [] [text "Bankaccounts"],
+      table [class "table"] [
+        thead [] [
+          tr [] [
+            th [scope "col"] [text "owner"],
+            th [scope "col"] [text "IBAN"],
+            th [scope "col"] [text "active"],
+            th [scope "col"] [text "balance"]
+          ]
+        ],
+        tbody [] (List.map createTableRowFromBankAccount model.bankAccounts)
+      ],
+      button [ type_ "button", class "btn btn-primary", onClick GetAllBankAccounts ] [ text "get all accounts" ]
     ]
 
-viewMainContent : Model -> Html Msg
-viewMainContent model =
-  div [] (List.map createBankAccountElement model.bankAccounts)
-    
+getAccountStatus : BankAccount -> String
+getAccountStatus acc = if acc.active then "active" else "inactive"
 
-createBankAccountElement : BankAccount -> Html Msg
-createBankAccountElement acc = 
-          div []
-          [
-            p [] [text acc.ibanNr],
-            p [] [text acc.owner],
-            p [] [text (String.fromInt acc.balance)]
-          ]
-
+createTableRowFromBankAccount : BankAccount -> Html Msg
+createTableRowFromBankAccount acc = tr [] [
+    th [scope "row"] [text acc.owner],
+    td [] [text acc.ibanNr],
+    td [] [text (getAccountStatus acc)],
+    td [] [text (String.fromInt acc.balance)]
+  ]
