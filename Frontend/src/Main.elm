@@ -4,11 +4,11 @@ import Browser
 import Html exposing (..)
 import Html.Events exposing (onClick)
 import Html.Attributes exposing (..)
-import Json.Decode exposing (Decoder, at, list, string, succeed)
-import Http exposing (expectJson)
+import Json.Decode exposing (Decoder, at, list, string, succeed, decodeString, errorToString)
+import Http exposing (expectJson, Expect)
 
 import Json.Encode
-import Json.Decode exposing (field)
+import Json.Decode exposing (field, string)
 import Html.Events exposing (onInput)
 import Http
 import Http
@@ -103,7 +103,10 @@ type alias Model =
     ibanFrom : String,
     ibanTo : String,
     amountForTransfer : Int,
-    error : String
+    error : String,
+    updateBalanceError : String,
+    createAccountError : String,
+    transferError : String
   }
 
 init : ( Model, Cmd Msg )
@@ -117,24 +120,30 @@ init =
       ibanFrom = "",
       ibanTo = "",
       amountForTransfer = 0,
-      error = ""}, Cmd.none )
+      error = "",
+      updateBalanceError = "",
+      createAccountError = "",
+      transferError = ""}, Cmd.none )
 
 type Msg = GetAllBankAccounts | 
-           BankAccountsResult (Result Http.Error (List BankAccount)) | 
+           BankAccountsResult (Result String (List BankAccount)) | 
            SetOwner String | 
            SetBalance Int |
            CreateBankAccount |
-           CreateBankAccountResult (Result Http.Error ()) |
+           CreateBankAccountResult (Result String BankAccount) |
            SetIbanForUpdate String |
            SetBalanceForUpdate Int |
            SetUpdateMethod String |
            UpdateBalance |
-           UpdateBalanceResult (Result Http.Error BankAccount) |
+           UpdateBalanceResult (Result String BankAccount) |
            SetIbanFrom String |
            SetIbanTo String |
            SetAmountForTransfer Int |
            Transfer |
-           TransferResult (Result Http.Error ())
+           TransferResult (Result String ()) |
+           DeleteUpdateBalanceError |
+           DeleteCreatAccountError |
+           DeleteTransferError
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -151,37 +160,36 @@ update msg model =
       ( model, getAllBankAccounts )
     BankAccountsResult result  -> case result of
        Ok listWithAccounts -> ({model | bankAccounts = listWithAccounts}, Cmd.none)
-       Err httpError -> ({model | bankAccounts = []}, Cmd.none )
+       Err _ -> ({model | bankAccounts = []}, Cmd.none )
     CreateBankAccountResult result -> case result of
        Ok _ -> (model, Cmd.none)
-       Err httpError -> (model, Cmd.none)
+       Err message -> ({model | createAccountError = message}, Cmd.none)
     UpdateBalanceResult result -> case result of
        Ok _ -> (model, Cmd.none)
-       Err httpError -> case httpError of
-          Http.BadBody _ -> ({model | error = "Test1"}, Cmd.none)
-          Http.BadUrl _ -> ({model | error = "Test2"}, Cmd.none)
-          Http.NetworkError -> ({model | error = "Test3"}, Cmd.none)
-          Http.Timeout -> ({model | error = "Test4"}, Cmd.none)
-          Http.BadStatus _ -> ({model | error = "Test5"}, Cmd.none)
+       Err message -> ({model | updateBalanceError = message}, Cmd.none)
+
     SetIbanTo to -> ({model | ibanTo = to}, Cmd.none)
     SetIbanFrom from -> ({model | ibanFrom = from}, Cmd.none)
     SetAmountForTransfer amount -> ({model | amountForTransfer = amount}, Cmd.none)
     Transfer -> (model, transfer model)
     TransferResult result -> case result of
        Ok _ -> (model, Cmd.none)
-       Err httpError -> (model, Cmd.none)
+       Err message -> ({model | transferError = message}, Cmd.none)
+    DeleteUpdateBalanceError -> ({model | updateBalanceError = ""}, Cmd.none)
+    DeleteCreatAccountError -> ({model | createAccountError = ""}, Cmd.none)
+    DeleteTransferError -> ({model | transferError = ""}, Cmd.none)
 
 getAllBankAccounts : Cmd Msg
 getAllBankAccounts = Http.get 
                         { url = "http://localhost:4000/accounts",
-                          expect = Http.expectJson BankAccountsResult decodeBankAccounts 
+                          expect = expectJson BankAccountsResult decodeBankAccounts 
                         }
 
 createBankAccount : Model -> Cmd Msg
 createBankAccount model = Http.post 
                         { url = "http://localhost:4000/accounts",
                           body = Http.jsonBody (encodeBankAccountRequest {owner = model.newOwner, balance = model.newBalance}),
-                          expect = Http.expectWhatever CreateBankAccountResult
+                          expect = expectJson CreateBankAccountResult decodeBankAccount 
                         }
 
 updateBalance : Model -> Cmd Msg
@@ -189,15 +197,35 @@ updateBalance model = Http.post
                       {
                         url = "http://localhost:4000/accounts/" ++ model.ibanForUpdate ++ "/" ++ String.toLower model.updateMethod ++ "?amount=" ++ (String.fromInt model.balanceForUpdate),
                         body = Http.emptyBody,
-                        expect = Http.expectJson UpdateBalanceResult decodeBankAccount
+                        expect = expectJson UpdateBalanceResult decodeBankAccount
                       }
+
+expectJson : (Result String a -> msg) -> Decoder a -> Expect msg
+expectJson toMsg decoder =
+  Http.expectStringResponse toMsg <|
+    \response ->
+      case response of
+        Http.BadUrl_ url ->
+          Err ("Fehler: Http.BadUrl: " ++ url)
+        Http.Timeout_ ->
+          Err "Fehler: Http.Timeout"
+        Http.NetworkError_ ->
+          Err "Fehler: Http.NetworkError"
+        Http.BadStatus_ metadata body ->
+          Err body
+        Http.GoodStatus_ metadata body ->
+          case decodeString decoder body of
+            Ok value ->
+              Ok value
+            Err err ->
+              Err (errorToString err)
 
 transfer : Model -> Cmd Msg
 transfer model = Http.post
                   {
                     url = "http://localhost:4000/accounts/transfer",
                     body = Http.jsonBody (encodeTransferRequest {from = model.ibanFrom, to = model.ibanTo, amount = model.amountForTransfer}),
-                    expect = Http.expectWhatever TransferResult
+                    expect = expectJson TransferResult (succeed ()) 
                   }
 
 view : Model -> Html Msg
@@ -219,18 +247,13 @@ view model = div [class "mb-5"] [
         ],
         button [ type_ "button", class "btn haskell-btn", onClick GetAllBankAccounts ] [ text "get all accounts" ]
       ],
-      newAccountView,
-      updateBalanceView,
-      transferView,
-      if model.error /= "" then errorView model else div [] []
+      newAccountView model,
+      updateBalanceView model,
+      transferView model
  ]
-
-errorView : Model -> Html Msg
-errorView model = div [class "alert alert-danger", attribute "role" "alert"] [
-  text model.error]
   
-newAccountView : Html Msg
-newAccountView = div [class "container mt-5"] [
+newAccountView : Model -> Html Msg
+newAccountView model = div [class "container mt-5"] [
     h3 [] [text "create new Bankaccount"],
     haskellBorder [
       div [] [
@@ -241,12 +264,13 @@ newAccountView = div [class "container mt-5"] [
         label [for "balance-input", class "form-label"] [text "Balance"],
         input [type_ "text", class "form-control", id "balance-input", placeholder "1000", onInput (\str -> SetBalance (Maybe.withDefault 0 (String.toInt str)))] []
       ],
-      button [ type_ "button", class "btn haskell-btn", onClick CreateBankAccount] [ text "create" ]
+      button [ type_ "button", class "btn haskell-btn", onClick CreateBankAccount] [ text "create" ],
+      customErrorView model.createAccountError DeleteCreatAccountError
     ]
   ]
 
-updateBalanceView : Html Msg
-updateBalanceView = div [class "container mt-5"] [
+updateBalanceView : Model -> Html Msg
+updateBalanceView model = div [class "container mt-5"] [
     h3 [] [text "update balance of Bankaccount"],
     haskellBorder [
       div [] [
@@ -262,12 +286,26 @@ updateBalanceView = div [class "container mt-5"] [
         option [value "withdraw"] [text "withdraw"],
         option [value "deposit"] [text "deposit"]
       ],
-      button [ type_ "button", class "btn haskell-btn", onClick UpdateBalance] [ text "update balance" ]
+      button [ type_ "button", class "btn haskell-btn", onClick UpdateBalance] [ text "update balance" ],
+      customErrorView model.updateBalanceError DeleteUpdateBalanceError
     ]
   ]
 
-transferView : Html Msg
-transferView = div [class "container mt-5"] [
+customErrorView : String -> Msg -> Html Msg
+customErrorView errorMsg deleteHandler = if (errorMsg /= "") 
+      then div [class "container alert alert-danger mt-4", attribute "role" "alert"] [
+              div [class "row align-items-center"] [
+                  div [class "col-11"] [text errorMsg], 
+                  div [class "col-1"] [
+                    button [ type_ "button", class "btn haskell-btn", onClick deleteHandler] [ text "X" ]
+                  ]
+              ]
+          
+            ] 
+      else text ""
+
+transferView : Model -> Html Msg
+transferView model = div [class "container mt-5"] [
     h3 [] [text "transfer"],
     haskellBorder [
       div [] [
@@ -282,7 +320,8 @@ transferView = div [class "container mt-5"] [
         label [for "amount-transfer-input", class "form-label"] [text "amount"],
         input [type_ "text", class "form-control", id "amount-transfer-input", placeholder "1000", onInput (\str -> SetAmountForTransfer (Maybe.withDefault 0 (String.toInt str)))] []
       ],
-      button [ type_ "button", class "btn haskell-btn", onClick Transfer] [ text "transfer" ]
+      button [ type_ "button", class "btn haskell-btn", onClick Transfer] [ text "transfer" ],
+      customErrorView model.transferError DeleteTransferError
     ]
   ]
 
