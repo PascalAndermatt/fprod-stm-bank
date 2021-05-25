@@ -91,7 +91,7 @@ main = do
 
       bankAccounts <- liftIO (readTVarIO (StmBank.accounts bank))
 
-      maybe (status status404) (\(from,to) -> do
+      maybe (status status412 >> json (StmUtil.stringToJson "Fehler: mind. 1 Konto nicht gefunden")) (\(from,to) -> do
           result <- runStmActionAtomically (StmBank.getResultOfStmAction (StmBank.transfer from to amount))
           createResponse result (\_ -> status status200)
         )(StmBank.maybeAccountsForTransfer transferRequest bankAccounts)
@@ -110,13 +110,8 @@ main = do
             json (toJSON response))
         ) maybeAccount
 
-    get "/test/error" $ do
-      status status500
-      json (StmUtil.stringToJson "Dies ist eine Test Fehlermeldung")
-
-
 withAccount :: (StmBank.BankAccount -> ActionM()) -> Maybe StmBank.BankAccount -> ActionM ()
-withAccount = maybe (status status404)
+withAccount = maybe (status status404 >> json (StmUtil.stringToJson "Konto wurde nicht gefunden"))
 
 createResponse :: StmBank.StmResult a -> (a -> ActionM ()) -> ActionM ()
 createResponse (StmBank.Error message) _ = (do

@@ -34,8 +34,9 @@ type BalanceUpdate       = BankAccount -> Int -> STM ()
 data StmResult a         = Error String | Result a
 
 -- Exception Types
-data BankException = NegativeAmount | AccountOverdrawn 
-                        | AccountInactive | AccountBalanceNotZero | InvalidOwner deriving Show
+data BankException = NegativeAmount | AccountOverdrawn | 
+                     AccountInactive | AccountBalanceNotZero | 
+                     OwnerLength | OwnerNonAlpha deriving Show
 instance Exception BankException
 
 -- REST DTO's (Request/Response) Types
@@ -83,19 +84,17 @@ getInitialAccounts = do
     result <- mapM (\(o,b) -> do
         randomSalt <- StmUtil.generateRandomSalt
         pure (o,b,randomSalt)) [("Pascal", 100), ("Turan", 200)]
-    -- printT result
     stmResult <- atomically (mapM (\tri -> getResultOfStmAction (createAccountFromTriple tri)) result)
-    -- printt stmResult
     maybe (putStrLn "initial bankAccount error" >> pure []) (\l -> pure l) (maybeAccounts stmResult)
 
-printT :: [(String, Int, Int)] -> IO ()
-printT [] = putStrLn "empty triple list" >> pure()
-printT (x:xs) = putStrLn (show x) >> printT xs
+-- printT :: [(String, Int, Int)] -> IO ()
+-- printT [] = putStrLn "empty triple list" >> pure()
+-- printT (x:xs) = putStrLn (show x) >> printT xs
 
-printt :: [StmResult BankAccount] -> IO ()
-printt [] = putStrLn "empty list" >> pure ()
-printt ((Result bankAcc):xs) = showAccount bankAcc >>= putStrLn >> (printt xs)
-printt ((Error msg):xs) = putStrLn msg >> (printt xs)
+-- printt :: [StmResult BankAccount] -> IO ()
+-- printt [] = putStrLn "empty list" >> pure ()
+-- printt ((Result bankAcc):xs) = showAccount bankAcc >>= putStrLn >> (printt xs)
+-- printt ((Error msg):xs) = putStrLn msg >> (printt xs)
 
 maybeAccounts :: [StmResult BankAccount] -> Maybe [BankAccount]
 maybeAccounts [] = Just []
@@ -111,30 +110,41 @@ createAccountFromRequest (BankAccountRequest owner bal) randomSalt =  getResultO
 -- can throw an Exception
 createAccount :: String -> Int -> Int -> STM (StmResult BankAccount)
 createAccount owner initBal randomSalt = do
-  when (initBal < 0) (throwSTM NegativeAmount)
-  when (length owner < 3 ) (throwSTM InvalidOwner)
+  throwStmExceptionWhenDataIsInvalid owner initBal
   let iban = createIban randomSalt owner 
   bankAccount <- (BankAccount iban owner <$> newTVar initBal <*> newTVar True)
   pure (Result bankAccount)
 
+
+throwStmExceptionWhenDataIsInvalid :: String -> Int -> STM ()
+throwStmExceptionWhenDataIsInvalid owner bal = do
+      when (bal < 0) (throwSTM NegativeAmount)
+      when (length owner < 3) (throwSTM OwnerLength)
+      when (isOwnerInValid owner) (throwSTM OwnerNonAlpha)
+      pure ()
+
+isOwnerInValid :: String -> Bool
+isOwnerInValid owner = not (all isLetter owner)
+
 -- can throw an Exception
 withdraw :: BankAccount -> Int -> STM ()
-withdraw (BankAccount _ _ tVarBal a) amount = do
-        when (amount < 0) (throwSTM NegativeAmount)
-        isActive <- readTVar a
-        when (not isActive) (throwSTM AccountInactive)
-        bal <- readTVar tVarBal
-        when (amount > bal) (throwSTM AccountOverdrawn)
-        writeTVar tVarBal (bal - amount)
+withdraw bankAcc amount = do
+    bal <- readTVar (balance bankAcc)
+    when (amount > bal) (throwSTM AccountOverdrawn)
+    updateBalance (-) bankAcc amount
 
 -- can throw an Exception
 deposit :: BankAccount -> Int -> STM ()
-deposit bankAcc amount = do
+deposit  = updateBalance (+)
+    
+
+updateBalance :: (Int -> Int -> Int) -> BankAccount -> Int -> STM ()
+updateBalance updateF bankAcc amount  = do
     when (amount < 0) (throwSTM NegativeAmount)
     isActive <- readTVar (active bankAcc)
     when (not isActive) (throwSTM AccountInactive)
     bal <- readTVar (balance bankAcc)
-    writeTVar (balance bankAcc) (bal + amount)
+    writeTVar (balance bankAcc) (updateF bal amount)
 
 transfer :: BankAccount -> BankAccount -> Int -> STM (StmResult ())
 transfer accountA accountB amount = do
@@ -181,9 +191,10 @@ getResultOfStmAction stmA = catchSTM stmA handleException
         handleException (AccountOverdrawn)       = pure (Error "Fehler: Das Konto kann nicht überzogen werden")
         handleException (AccountInactive)        = pure (Error "Fehler: Das Konto ist inaktiv")
         handleException (AccountBalanceNotZero)  = pure (Error "Fehler: Der Betrag auf dem Konto ist nicht 0")
-        handleException (InvalidOwner)           = pure (Error "Fehler: Der Owner muss mind. 3 Zeichen enthalten")
+        handleException (OwnerLength)            = pure (Error "Fehler: Der Owner muss mind. 3 Zeichen enthalten")
+        handleException (OwnerNonAlpha)          = pure (Error "Fehler: Der Owner darf nur gültige Zeichen enthalten: [a-Z]")
 
-showAccount :: BankAccount -> IO String -- evtl. STM Action
+showAccount :: BankAccount -> IO String
 showAccount (BankAccount iban owner tVarbal tVarActive) = do
     bal <- readTVarIO tVarbal
     isActive <- readTVarIO tVarActive
