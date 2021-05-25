@@ -45,10 +45,14 @@ main = do
     post "/accounts" $ do
       bankAccountRequest <- jsonData :: ActionM StmBank.BankAccountRequest
       randomSalt <- liftIO StmUtil.generateRandomSalt
-      newAccount <- runStmActionAtomically (StmBank.createAccountFromRequest bankAccountRequest randomSalt)
-      runStmActionAtomically (StmBank.addBankAccount (StmBank.accounts bank) newAccount)
-      status status201
-
+      stmResult <- runStmActionAtomically (StmBank.createAccountFromRequest bankAccountRequest randomSalt)
+      createResponse stmResult (\acc -> do
+              runStmActionAtomically (StmBank.addBankAccount (StmBank.accounts bank) acc)
+              response <- runStmActionAtomically (StmBank.toBankAccountResponse acc)
+              json (toJSON response)
+              status status201
+        )
+      
     post "/accounts/:id/withdraw" $ do
       iban <- param "id"
       amount <- param "amount"
