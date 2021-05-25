@@ -102,7 +102,8 @@ type alias Model =
     updateMethod : String,
     ibanFrom : String,
     ibanTo : String,
-    amountForTransfer : Int
+    amountForTransfer : Int,
+    error : String
   }
 
 init : ( Model, Cmd Msg )
@@ -115,7 +116,8 @@ init =
       updateMethod = "",
       ibanFrom = "",
       ibanTo = "",
-      amountForTransfer = 0}, Cmd.none )
+      amountForTransfer = 0,
+      error = ""}, Cmd.none )
 
 type Msg = GetAllBankAccounts | 
            BankAccountsResult (Result Http.Error (List BankAccount)) | 
@@ -155,7 +157,12 @@ update msg model =
        Err httpError -> (model, Cmd.none)
     UpdateBalanceResult result -> case result of
        Ok _ -> (model, Cmd.none)
-       Err httpError -> (model, Cmd.none)
+       Err httpError -> case httpError of
+          Http.BadBody _ -> ({model | error = "Test1"}, Cmd.none)
+          Http.BadUrl _ -> ({model | error = "Test2"}, Cmd.none)
+          Http.NetworkError -> ({model | error = "Test3"}, Cmd.none)
+          Http.Timeout -> ({model | error = "Test4"}, Cmd.none)
+          Http.BadStatus _ -> ({model | error = "Test5"}, Cmd.none)
     SetIbanTo to -> ({model | ibanTo = to}, Cmd.none)
     SetIbanFrom from -> ({model | ibanFrom = from}, Cmd.none)
     SetAmountForTransfer amount -> ({model | amountForTransfer = amount}, Cmd.none)
@@ -214,8 +221,13 @@ view model = div [class "mb-5"] [
       ],
       newAccountView,
       updateBalanceView,
-      transferView
-  ]
+      transferView,
+      if model.error /= "" then errorView model else div [] []
+ ]
+
+errorView : Model -> Html Msg
+errorView model = div [class "alert alert-danger", attribute "role" "alert"] [
+  text model.error]
   
 newAccountView : Html Msg
 newAccountView = div [class "container mt-5"] [
