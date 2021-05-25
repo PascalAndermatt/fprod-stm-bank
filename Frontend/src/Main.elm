@@ -96,7 +96,7 @@ main =
 type alias Model =
   { bankAccounts : List BankAccount,
     newOwner : String,
-    newBalance : Int,
+    newBalance : String,
     ibanForUpdate : String,
     balanceForUpdate : Int,
     updateMethod : String,
@@ -113,7 +113,7 @@ init : ( Model, Cmd Msg )
 init =
   ( { bankAccounts = [], 
       newOwner = "", 
-      newBalance = 0,
+      newBalance = "",
       ibanForUpdate = "",
       balanceForUpdate = 0,
       updateMethod = "",
@@ -128,7 +128,7 @@ init =
 type Msg = GetAllBankAccounts | 
            BankAccountsResult (Result String (List BankAccount)) | 
            SetOwner String | 
-           SetBalance Int |
+           SetBalance String |
            CreateBankAccount |
            CreateBankAccountResult (Result String BankAccount) |
            SetIbanForUpdate String |
@@ -154,7 +154,7 @@ update msg model =
     SetOwner owner -> ({model | newOwner = owner}, Cmd.none)
     SetBalance bal -> ({model | newBalance = bal}, Cmd.none)
     SetUpdateMethod str -> ({model | updateMethod = str}, Cmd.none)
-    CreateBankAccount -> (model, createBankAccount model)
+    CreateBankAccount -> ({model | newBalance = "", newOwner = ""}, createBankAccount model)
     UpdateBalance -> (model, updateBalance model)
     GetAllBankAccounts ->
       ( model, getAllBankAccounts )
@@ -188,7 +188,7 @@ getAllBankAccounts = Http.get
 createBankAccount : Model -> Cmd Msg
 createBankAccount model = Http.post 
                         { url = "http://localhost:4000/accounts",
-                          body = Http.jsonBody (encodeBankAccountRequest {owner = model.newOwner, balance = model.newBalance}),
+                          body = Http.jsonBody (encodeBankAccountRequest {owner = model.newOwner, balance = Maybe.withDefault 0 (String.toInt model.newBalance)}),
                           expect = expectJson CreateBankAccountResult decodeBankAccount 
                         }
 
@@ -258,11 +258,11 @@ newAccountView model = div [class "container mt-5"] [
     haskellBorder [
       div [] [
         label [for "owner-input", class "form-label"] [text "Owner"],
-        input [type_ "text", class "form-control", id "owner-input", placeholder "Peter", onInput SetOwner] []
+        input [value model.newOwner, type_ "text", class "form-control", id "owner-input", placeholder "Peter", onInput SetOwner] []
       ],
       div [class "mb-4"] [
         label [for "balance-input", class "form-label"] [text "Balance"],
-        input [type_ "text", class "form-control", id "balance-input", placeholder "1000", onInput (\str -> SetBalance (Maybe.withDefault 0 (String.toInt str)))] []
+        input [value model.newBalance, type_ "text", class "form-control", id "balance-input", placeholder "1000", onInput SetBalance] []
       ],
       button [ type_ "button", class "btn haskell-btn", onClick CreateBankAccount] [ text "create" ],
       customErrorView model.createAccountError DeleteCreatAccountError
