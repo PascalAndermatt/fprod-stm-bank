@@ -106,7 +106,9 @@ type alias Model =
     error : String,
     updateBalanceError : String,
     createAccountError : String,
-    transferError : String
+    transferError : String,
+    closeAccountError :String,
+    ibanForClosing : String
   }
 
 init : ( Model, Cmd Msg )
@@ -123,7 +125,9 @@ init =
       error = "",
       updateBalanceError = "",
       createAccountError = "",
-      transferError = ""}, Cmd.none )
+      transferError = "",
+      closeAccountError = "",
+      ibanForClosing = ""}, Cmd.none )
 
 type Msg = GetAllBankAccounts | 
            BankAccountsResult (Result String (List BankAccount)) | 
@@ -143,7 +147,11 @@ type Msg = GetAllBankAccounts |
            TransferResult (Result String ()) |
            DeleteUpdateBalanceError |
            DeleteCreatAccountError |
-           DeleteTransferError
+           DeleteTransferError |
+           SetIbanForClosing String |
+           CloseAccount |
+           DeleteCloseAccountError |
+           CloseAccountResult (Result String BankAccount)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -178,6 +186,12 @@ update msg model =
     DeleteUpdateBalanceError -> ({model | updateBalanceError = ""}, Cmd.none)
     DeleteCreatAccountError -> ({model | createAccountError = ""}, Cmd.none)
     DeleteTransferError -> ({model | transferError = ""}, Cmd.none)
+    SetIbanForClosing iban -> ({model | ibanForClosing = iban}, Cmd.none)
+    CloseAccount -> (model, closeAccount model)
+    DeleteCloseAccountError -> ({model | closeAccountError = ""}, Cmd.none)
+    CloseAccountResult result -> case result of
+       Ok _ -> (model, Cmd.none)
+       Err message -> ({model | closeAccountError = message}, Cmd.none)
 
 getAllBankAccounts : Cmd Msg
 getAllBankAccounts = Http.get 
@@ -228,6 +242,14 @@ transfer model = Http.post
                     expect = expectJson TransferResult (succeed ()) 
                   }
 
+closeAccount : Model -> Cmd Msg
+closeAccount model = Http.post 
+                      {
+                        url = ("http://localhost:4000/accounts/close/" ++ model.ibanForClosing),
+                        body = Http.emptyBody,
+                        expect = expectJson CloseAccountResult decodeBankAccount
+                      }
+
 view : Model -> Html Msg
 view model = div [class "mb-5"] [
     createNavBar,
@@ -249,7 +271,8 @@ view model = div [class "mb-5"] [
       ],
       newAccountView model,
       updateBalanceView model,
-      transferView model
+      transferView model,
+      closeAccountView model
  ]
   
 newAccountView : Model -> Html Msg
@@ -322,6 +345,19 @@ transferView model = div [class "container mt-5"] [
       ],
       button [ type_ "button", class "btn haskell-btn", onClick Transfer] [ text "transfer" ],
       customErrorView model.transferError DeleteTransferError
+    ]
+  ]
+
+closeAccountView : Model -> Html Msg
+closeAccountView model = div [class "container mt-5"] [
+    h3 [] [text "close account"],
+    haskellBorder [
+      div [class "mb-4"] [
+        label [for "ibanInput", class "form-label"] [text "iban"],
+        input [type_ "text", class "form-control", id "ibanInput", placeholder "CH2707888954202552370TUR", onInput SetIbanForClosing] []
+      ],
+      button [ type_ "button", class "btn haskell-btn", onClick CloseAccount] [ text "close account" ],
+      customErrorView model.closeAccountError DeleteCloseAccountError
     ]
   ]
 
