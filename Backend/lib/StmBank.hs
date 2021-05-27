@@ -31,9 +31,6 @@ data Bank                = Bank { accounts:: TVar BankAccounts}
 type BankAccounts        = Map String BankAccount
 data BankAccount         = BankAccount { ibanNr :: String, name :: String, balance :: TVar Int, active :: TVar Bool }
 
-instance Eq BankAccount where
-    (==) (BankAccount i n b a) (BankAccount i2 n2 b2 a2) = i == i2 && n == n2 && b == b2 && a == a2
-
 type BalanceUpdate       = BankAccount -> Int -> STM ()
 data StmResult a         = Error String | Result a
 
@@ -125,7 +122,6 @@ throwStmExceptionWhenDataIsInvalid owner bal = do
       when (bal < 0) (throwSTM NegativeAmount)
       when (length owner < 3) (throwSTM OwnerLength)
       when (isOwnerInValid owner) (throwSTM OwnerNonAlpha)
-      pure ()
 
 isOwnerInValid :: String -> Bool
 isOwnerInValid owner = not (all isLetter owner)

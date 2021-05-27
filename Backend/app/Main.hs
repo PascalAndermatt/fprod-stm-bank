@@ -56,8 +56,7 @@ main = do
     post "/accounts/:id/withdraw" $ do
       iban <- param "id"
       amount <- param "amount"
-      -- adjust :: Ord k => (a -> a) -> k -> Map k a -> Map k a
-      -- modifyTVar :: TVar a -> (a -> a) -> STM ()
+
       let tVarBankAccounts = (StmBank.accounts bank)
       bankAccounts <- liftIO (readTVarIO tVarBankAccounts)
       let maybeAccount = StmBank.findBankAccountById iban bankAccounts
