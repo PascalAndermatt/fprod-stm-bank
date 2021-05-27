@@ -24,6 +24,14 @@ type alias TransferRequest =
     , amount : Int
     }
 
+type alias LabelTextInputPair = 
+    {
+      labelId : String,
+      labelText : String,
+      inputPlaceholder : String,
+      onInputHandler : String -> Msg
+    }
+
 decodeTransferRequest : Json.Decode.Decoder TransferRequest
 decodeTransferRequest =
     Json.Decode.map3 TransferRequest
@@ -83,6 +91,8 @@ encodeBankAccount record =
         , ("ibanNr",  Json.Encode.string <| record.ibanNr)
         ]
 
+baseUrl : String
+baseUrl = "http://localhost:4000/accounts"
 
 main : Program () Model Msg
 main =
@@ -195,13 +205,13 @@ update msg model =
 
 getAllBankAccounts : Cmd Msg
 getAllBankAccounts = Http.get 
-                        { url = "http://localhost:4000/accounts",
+                        { url = baseUrl,
                           expect = expectJson BankAccountsResult decodeBankAccounts 
                         }
 
 createBankAccount : Model -> Cmd Msg
 createBankAccount model = Http.post 
-                        { url = "http://localhost:4000/accounts",
+                        { url = baseUrl,
                           body = Http.jsonBody (encodeBankAccountRequest {owner = model.newOwner, balance = Maybe.withDefault 0 (String.toInt model.newBalance)}),
                           expect = expectJson CreateBankAccountResult decodeBankAccount 
                         }
@@ -209,7 +219,7 @@ createBankAccount model = Http.post
 updateBalance : Model -> Cmd Msg
 updateBalance model = Http.post
                       {
-                        url = "http://localhost:4000/accounts/" ++ model.ibanForUpdate ++ "/" ++ String.toLower model.updateMethod ++ "?amount=" ++ (String.fromInt model.balanceForUpdate),
+                        url = baseUrl ++ "/" ++ model.ibanForUpdate ++ "/" ++ String.toLower model.updateMethod ++ "?amount=" ++ (String.fromInt model.balanceForUpdate),
                         body = Http.emptyBody,
                         expect = expectJson UpdateBalanceResult decodeBankAccount
                       }
@@ -237,7 +247,7 @@ expectJson toMsg decoder =
 transfer : Model -> Cmd Msg
 transfer model = Http.post
                   {
-                    url = "http://localhost:4000/accounts/transfer",
+                    url = baseUrl ++ "/transfer",
                     body = Http.jsonBody (encodeTransferRequest {from = model.ibanFrom, to = model.ibanTo, amount = model.amountForTransfer}),
                     expect = expectJson TransferResult (succeed ()) 
                   }
@@ -245,7 +255,7 @@ transfer model = Http.post
 closeAccount : Model -> Cmd Msg
 closeAccount model = Http.post 
                       {
-                        url = ("http://localhost:4000/accounts/close/" ++ model.ibanForClosing),
+                        url = (baseUrl ++ "/close/" ++ model.ibanForClosing),
                         body = Http.emptyBody,
                         expect = expectJson CloseAccountResult decodeBankAccount
                       }
@@ -258,16 +268,11 @@ view model = div [class "mb-5"] [
         h3 [class "mb-4"] [text "Bankaccounts"],
         table [class "table"] [
           thead [] [
-            tr [] [
-              th [scope "col"] [text "owner"],
-              th [scope "col"] [text "IBAN"],
-              th [scope "col"] [text "active"],
-              th [scope "col"] [text "balance"]
-            ]
+            tr [] (List.map (\str -> th [scope "col"] [text str]) ["owner", "IBAN", "active", "balance"])
           ],
           tbody [] (List.map createTableRowFromBankAccount model.bankAccounts)
         ],
-        button [ type_ "button", class "btn haskell-btn", onClick GetAllBankAccounts ] [ text "get all accounts" ]
+        createHaskellButton "get all accounts" GetAllBankAccounts
       ],
       newAccountView model,
       updateBalanceView model,
@@ -277,42 +282,36 @@ view model = div [class "mb-5"] [
   
 newAccountView : Model -> Html Msg
 newAccountView model = div [class "container mt-5"] [
-    h3 [] [text "create new Bankaccount"],
+    viewBoxTitle "create new Bankaccount",
     haskellBorder [
-      div [] [
-        label [for "owner-input", class "form-label"] [text "Owner"],
-        input [value model.newOwner, type_ "text", class "form-control", id "owner-input", placeholder "Peter", onInput SetOwner] []
-      ],
-      div [class "mb-4"] [
-        label [for "balance-input", class "form-label"] [text "Balance"],
-        input [value model.newBalance, type_ "text", class "form-control", id "balance-input", placeholder "1000", onInput SetBalance] []
-      ],
-      button [ type_ "button", class "btn haskell-btn", onClick CreateBankAccount] [ text "create" ],
+      labelInputPairMarginBottom (LabelTextInputPair "ownerInput" "Owner" "Peter" SetOwner),
+      labelInputPairMarginBottom (LabelTextInputPair "balanceInput" "Balance" "1000" SetBalance),
+      createHaskellButton "create" CreateBankAccount,
       customErrorView model.createAccountError DeleteCreatAccountError
     ]
   ]
 
+ibanPlaceholder : String
+ibanPlaceholder = "CH2707888954202552370TUR"
+
 updateBalanceView : Model -> Html Msg
 updateBalanceView model = div [class "container mt-5"] [
-    h3 [] [text "update balance of Bankaccount"],
+    viewBoxTitle "update balance of Bankaccount",
     haskellBorder [
-      div [] [
-        label [for "iban-input", class "form-label"] [text "IBAN"],
-        input [type_ "text", class "form-control", id "iban-input", placeholder "CH2707888954202552370TUR", onInput SetIbanForUpdate] []
-      ],
-      div [class "mb-4"] [
-        label [for "balance-input", class "form-label"] [text "Balance"],
-        input [type_ "text", class "form-control", id "balance-input", placeholder "1000", onInput (\str -> SetBalanceForUpdate (Maybe.withDefault 0 (String.toInt str)))] []
-      ],
+      labelInputPairMarginBottom (LabelTextInputPair "ibanForUpdate" "IBAN" ibanPlaceholder SetIbanForUpdate),
+      labelInputPairMarginBottom (LabelTextInputPair "amountForUpdate" "Balance" "1000" (\str -> SetBalanceForUpdate (Maybe.withDefault 0 (String.toInt str)))),
       select [class "form-select mb-4", onInput SetUpdateMethod] [
         option [selected True ] [text "choose update action"],
         option [value "withdraw"] [text "withdraw"],
         option [value "deposit"] [text "deposit"]
       ],
-      button [ type_ "button", class "btn haskell-btn", onClick UpdateBalance] [ text "update balance" ],
+      createHaskellButton "update balance" UpdateBalance,
       customErrorView model.updateBalanceError DeleteUpdateBalanceError
     ]
   ]
+
+viewBoxTitle : String -> Html Msg
+viewBoxTitle t = h3 [] [text t]
 
 customErrorView : String -> Msg -> Html Msg
 customErrorView errorMsg deleteHandler = if (errorMsg /= "") 
@@ -329,37 +328,38 @@ customErrorView errorMsg deleteHandler = if (errorMsg /= "")
 
 transferView : Model -> Html Msg
 transferView model = div [class "container mt-5"] [
-    h3 [] [text "transfer"],
+    viewBoxTitle "transfer",
     haskellBorder [
-      div [] [
-        label [for "from-input", class "form-label"] [text "from"],
-        input [type_ "text", class "form-control", id "from-input", placeholder "CH2707888954202552370TUR", onInput SetIbanFrom] []
-      ],
-      div [] [
-        label [for "to-input", class "form-label"] [text "to"],
-        input [type_ "text", class "form-control", id "to-input", placeholder "CH2707888954202552370TUR", onInput SetIbanTo] []
-      ],
-      div [class "mb-4"] [
-        label [for "amount-transfer-input", class "form-label"] [text "amount"],
-        input [type_ "text", class "form-control", id "amount-transfer-input", placeholder "1000", onInput (\str -> SetAmountForTransfer (Maybe.withDefault 0 (String.toInt str)))] []
-      ],
-      button [ type_ "button", class "btn haskell-btn", onClick Transfer] [ text "transfer" ],
+      labelInputPairMarginBottom (LabelTextInputPair "ibanFrom" "from" ibanPlaceholder SetIbanFrom),
+      labelInputPairMarginBottom (LabelTextInputPair "ibanTo" "to" ibanPlaceholder SetIbanTo),
+      labelInputPairMarginBottom (LabelTextInputPair "amountTransfer" "amount" "1000" (\str -> SetAmountForTransfer (Maybe.withDefault 0 (String.toInt str)))),
+      createHaskellButton "transfer" Transfer,
       customErrorView model.transferError DeleteTransferError
     ]
   ]
 
 closeAccountView : Model -> Html Msg
 closeAccountView model = div [class "container mt-5"] [
-    h3 [] [text "close account"],
+    viewBoxTitle "close account",
     haskellBorder [
-      div [class "mb-4"] [
-        label [for "ibanInput", class "form-label"] [text "iban"],
-        input [type_ "text", class "form-control", id "ibanInput", placeholder "CH2707888954202552370TUR", onInput SetIbanForClosing] []
-      ],
-      button [ type_ "button", class "btn haskell-btn", onClick CloseAccount] [ text "close account" ],
+      labelInputPairMarginBottom (LabelTextInputPair "ibanForClosing" "iban" ibanPlaceholder SetIbanForClosing),
+      createHaskellButton "close account" CloseAccount,
       customErrorView model.closeAccountError DeleteCloseAccountError
     ]
   ]
+
+createHaskellButton : String -> Msg -> Html Msg
+createHaskellButton bText handler = 
+              button [ type_ "button", class "btn haskell-btn", onClick handler] [ text bText ]
+
+labelInputPairMarginBottom : LabelTextInputPair -> Html Msg
+labelInputPairMarginBottom data = div [class "mb-4"] (createLabelTextInputPair data)
+
+createLabelTextInputPair : LabelTextInputPair -> List (Html Msg)
+createLabelTextInputPair data = [
+          label [for data.labelId, class "form-label"] [text data.labelText],
+          input [type_ "text", class "form-control", id data.labelId, placeholder data.inputPlaceholder, onInput data.onInputHandler] [] 
+        ]
 
 haskellBorder : List (Html Msg) -> Html Msg
 haskellBorder content = div [class "haskell-border p-4"] content
