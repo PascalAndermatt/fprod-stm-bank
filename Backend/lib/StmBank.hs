@@ -5,11 +5,12 @@ Dieses Modul enthält Funktionen um...
 module StmBank 
 (
     getInitialAccounts, createInitialBank, findBankAccountById,
-    BankAccount, Bank (..), BankAccountResponse, toBankAccountResponse, 
-    createAccountFromTriple, ibanNr, BankAccountRequest, createAccountFromRequest,
+    BankAccount (..), Bank (..), BankAccountResponse, toBankAccountResponse, 
+    createAccountFromTriple, BankAccountRequest, createAccountFromRequest,
     addBankAccount, withdraw, deposit, BalanceUpdate, BankAccounts, TransferRequest (..),
     maybeAccountsForTransfer, StmResult (..), BankException (..), updateBalanceOfAccountInBank,
-    getResultOfStmAction, updateStatusOfAccountInBank, transfer
+    getResultOfStmAction, updateStatusOfAccountInBank, transfer,
+    maybeResult, isOwnerInValid, createIban
 )
 where
 
@@ -29,6 +30,9 @@ import           Control.Exception (Exception)
 data Bank                = Bank { accounts:: TVar BankAccounts}
 type BankAccounts        = Map String BankAccount
 data BankAccount         = BankAccount { ibanNr :: String, name :: String, balance :: TVar Int, active :: TVar Bool }
+
+instance Eq BankAccount where
+    (==) (BankAccount i n b a) (BankAccount i2 n2 b2 a2) = i == i2 && n == n2 && b == b2 && a == a2
 
 type BalanceUpdate       = BankAccount -> Int -> STM ()
 data StmResult a         = Error String | Result a
@@ -85,7 +89,7 @@ getInitialAccounts = do
         randomSalt <- StmUtil.generateRandomSalt
         pure (o,b,randomSalt)) [("Pascal", 100), ("Turan", 200)]
     stmResult <- atomically (mapM (\tri -> getResultOfStmAction (createAccountFromTriple tri)) result)
-    maybe (putStrLn "initial bankAccount error" >> pure []) (\l -> pure l) (maybeAccounts stmResult)
+    maybe (putStrLn "initial bankAccount error" >> pure []) (\l -> pure l) (maybeResult stmResult)
 
 -- printT :: [(String, Int, Int)] -> IO ()
 -- printT [] = putStrLn "empty triple list" >> pure()
@@ -96,10 +100,10 @@ getInitialAccounts = do
 -- printt ((Result bankAcc):xs) = showAccount bankAcc >>= putStrLn >> (printt xs)
 -- printt ((Error msg):xs) = putStrLn msg >> (printt xs)
 
-maybeAccounts :: [StmResult BankAccount] -> Maybe [BankAccount]
-maybeAccounts [] = Just []
-maybeAccounts ((Result bankAcc):xs) = fmap (bankAcc:) (maybeAccounts xs)
-maybeAccounts ((Error _):_) = Nothing
+maybeResult :: [StmResult a] -> Maybe [a]
+maybeResult [] = Just []
+maybeResult ((Result x):xs) = fmap (x:) (maybeResult xs)
+maybeResult ((Error _):_) = Nothing
 
 createAccountFromTriple :: (String, Int, Int) -> STM (StmResult BankAccount)
 createAccountFromTriple (owner, initBal, randomSalt) = createAccount owner initBal randomSalt
