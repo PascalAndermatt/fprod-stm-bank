@@ -92,7 +92,7 @@ main = do
 
       maybe (status status412 >> json (StmUtil.stringToJson "Fehler: mind. 1 Konto nicht gefunden")) (\(from,to) -> do
           result <- runStmActionAtomically (StmBank.getResultOfStmAction (StmBank.transfer from to amount))
-          createResponse result (\_ -> status status200)
+          createResponse result (\_ -> json (StmUtil.stringToJson "dfb"))
         )(StmBank.maybeAccountsForTransfer transferRequest bankAccounts)
 
     post "/accounts/close/:id" $ do
