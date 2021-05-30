@@ -173,7 +173,7 @@ update msg model =
     SetOwner owner -> ({model | newOwner = owner}, Cmd.none)
     SetBalance bal -> ({model | newBalance = bal}, Cmd.none)
     SetUpdateMethod str -> ({model | updateMethod = str}, Cmd.none)
-    CreateBankAccount -> ({model | newBalance = "", newOwner = ""}, createBankAccount model)
+    CreateBankAccount -> ({model | newBalance = "", newOwner = ""}, createBankAccount model) -- ?? model update hier nötig ??
     UpdateBalance -> (model, updateBalance model)
     GetAllBankAccounts ->
       ( model, getAllBankAccounts )
@@ -210,6 +210,7 @@ getAllBankAccounts = Http.get
                           expect = expectJson BankAccountsResult decodeBankAccounts 
                         }
 
+-- todo: check pre condition: are fields not empty and valid ? then exceute rest call
 createBankAccount : Model -> Cmd Msg
 createBankAccount model = Http.post 
                         { url = baseUrl,
@@ -342,7 +343,6 @@ transferView model = div [class "container mt-5"] [
     ]
   ]
 
--- (\str -> SetAmountForTransfer (Maybe.withDefault 0 (String.toInt str)))
 closeAccountView : Model -> Html Msg
 closeAccountView model = div [class "container mt-5"] [
     viewBoxTitle "close account",
@@ -374,7 +374,7 @@ getAccountStatus acc = if acc.active then "active" else "inactive"
 
 createTableRowFromBankAccount : BankAccount -> Html Msg
 createTableRowFromBankAccount acc = tr [] [
-    th [scope "row"] [text acc.owner],
+    td [] [text acc.owner],
     td [] [text acc.ibanNr],
     td [] [text (getAccountStatus acc)],
     td [] [text (String.fromInt acc.balance)]
