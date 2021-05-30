@@ -226,7 +226,7 @@ updateBalance model = Http.post
                       }
 
 expectJson : (Result String a -> msg) -> Decoder a -> Expect msg
-expectJson toMsg decoder =
+expectJson toMsg decoder = 
   Http.expectStringResponse toMsg <|
     \response ->
       case response of
@@ -239,14 +239,14 @@ expectJson toMsg decoder =
         Http.BadStatus_ metadata body ->
           Err body
         Http.GoodStatus_ metadata body ->
-          case decodeString decoder (te body) of
+          case decodeString decoder (convertBody body) of
             Ok value ->
               Ok value
             Err err ->
-              Err ("ethetrherthrt")
+              Err (errorToString err)
 
-te : String -> String
-te str = if str == "" then "random" else str
+convertBody : String -> String
+convertBody body = if body == "" then "{}" else body
 
 transfer : Model -> Cmd Msg
 transfer model = Http.post
