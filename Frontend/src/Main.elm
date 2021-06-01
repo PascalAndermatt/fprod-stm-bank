@@ -120,7 +120,8 @@ type alias Model =
     createAccountError : String,
     transferError : String,
     closeAccountError :String,
-    ibanForClosing : String
+    ibanForClosing : String,
+    getAccountsError : String
   }
 
 init : ( Model, Cmd Msg )
@@ -139,10 +140,12 @@ init =
       createAccountError  = "",
       transferError       = "",
       closeAccountError   = "",
-      ibanForClosing      = ""
+      ibanForClosing      = "",
+      getAccountsError    = ""
     }, getAllBankAccounts )
 
 type Msg = GetAllBankAccounts | 
+           DeleteGetAllBankAccountsError |
            BankAccountsResult (Result String (List BankAccount)) | 
            SetOwner String | 
            SetBalanceForCreate String |
@@ -174,8 +177,9 @@ update msg model =
     -- get all accounts
     GetAllBankAccounts              -> ( model, getAllBankAccounts )
     BankAccountsResult result       -> case result of
-       Ok accounts -> ({model | bankAccounts = accounts}, Cmd.none)
-       Err _       -> ({model | bankAccounts = []}, Cmd.none )
+       Ok accounts -> ({model | bankAccounts = accounts, getAccountsError = ""}, Cmd.none)
+       Err message -> ({model | bankAccounts = [], getAccountsError = message}, Cmd.none )
+    DeleteGetAllBankAccountsError   -> ({model | getAccountsError = ""}, Cmd.none )
 
     -- create account
     SetOwner o                      -> ({model | newOwner = o}, Cmd.none)
@@ -312,26 +316,30 @@ convertBody : String -> String
 convertBody body = if body == "" then "{}" else body
 
 
-
 view : Model -> Html Msg
 view model = div [class "mb-5"] [
     createNavBar,
-    div [ class "container" ]
-      [ 
-        h3 [class "mb-4"] [text "Bankaccounts"],
-        table [class "table"] [
-          thead [] [
-            tr [] (List.map (\str -> th [scope "col"] [text str]) ["owner", "IBAN", "active", "balance"])
-          ],
-          tbody [] (List.map createTableRowFromBankAccount model.bankAccounts)
-        ],
-        createHaskellButton "get all accounts" GetAllBankAccounts
-      ],
-      newAccountView model,
-      updateBalanceView model,
-      transferView model,
-      closeAccountView model
- ]
+    getAllAccountsView model,
+    newAccountView model,
+    updateBalanceView model,
+    transferView model,
+    closeAccountView model
+  ]
+
+getAllAccountsView : Model -> Html Msg
+getAllAccountsView model = div [ class "container mt-5"] [
+        viewBoxTitle "Bankaccounts",
+        haskellBorder [
+            table [class "table"] [
+              thead [] [
+                tr [] (List.map (\str -> th [scope "col"] [text str]) ["owner", "IBAN", "active", "balance"])
+              ],
+              tbody [] (List.map createTableRowFromBankAccount model.bankAccounts)
+            ],
+            createHaskellButton "get all accounts" GetAllBankAccounts,
+            customErrorView model.getAccountsError DeleteGetAllBankAccountsError
+          ]
+      ]
   
 newAccountView : Model -> Html Msg
 newAccountView model = div [class "container mt-5"] [
