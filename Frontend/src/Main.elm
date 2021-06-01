@@ -92,6 +92,7 @@ encodeBankAccount record =
         , ("ibanNr",  Json.Encode.string <| record.ibanNr)
         ]
 
+-- konstante
 baseUrl : String
 baseUrl = "http://localhost:4000/accounts"
 
@@ -125,20 +126,21 @@ type alias Model =
 init : ( Model, Cmd Msg )
 init =
   ( { bankAccounts = [], 
-      newOwner = "", 
-      newBalance = "",
-      ibanForUpdate = "",
-      balanceForUpdate = "",
+      newOwner            = "", 
+      newBalance          = "",
+      ibanForUpdate       = "",
+      balanceForUpdate    = "",
       balanceUpdateAction = "",
-      ibanFrom = "",
-      ibanTo = "",
-      amountForTransfer = "",
-      error = "",
-      updateBalanceError = "",
-      createAccountError = "",
-      transferError = "",
-      closeAccountError = "",
-      ibanForClosing = ""}, getAllBankAccounts )
+      ibanFrom            = "",
+      ibanTo              = "",
+      amountForTransfer   = "",
+      error               = "",
+      updateBalanceError  = "",
+      createAccountError  = "",
+      transferError       = "",
+      closeAccountError   = "",
+      ibanForClosing      = ""
+    }, getAllBankAccounts )
 
 type Msg = GetAllBankAccounts | 
            BankAccountsResult (Result String (List BankAccount)) | 
@@ -248,8 +250,6 @@ isAnyInputFieldEmpty : List String -> Result String ()
 isAnyInputFieldEmpty fields = if List.any String.isEmpty fields
                                     then Err "Fehler: nicht alle Felder ausgefüllt"
                                     else Ok ()
-
-
 
 updateBalance : Model -> (Model, Cmd Msg)
 updateBalance model = case validateBalanceUpdateRequest model of
@@ -368,9 +368,6 @@ str_WITHDRAW = "withdraw"
 
 str_DEPOSIT : String
 str_DEPOSIT = "deposit"
-
-
-type BalanceUpdateAction = Withdrwa | Deposit 
 
 viewBoxTitle : String -> Html Msg
 viewBoxTitle t = h3 [] [text t]

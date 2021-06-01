@@ -29,6 +29,7 @@ main = do
 
     get "/" $ file "static/index.html"
 
+
     get "/accounts" $ do
       bankAccounts <- liftIO (readTVarIO (StmBank.accounts bank))
       response <- runStmActionAtomically (mapM StmBank.toBankAccountResponse (Map.elems bankAccounts))

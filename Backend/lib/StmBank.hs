@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-|
-Dieses Modul enthält Funktionen um...
+    Dieses Modul enthält Funktionen ..
 -}
 module StmBank 
 (
@@ -88,15 +88,6 @@ getInitialAccounts = do
     stmResult <- atomically (mapM (\tri -> getResultOfStmAction (createAccountFromTriple tri)) result)
     maybe (putStrLn "initial bankAccount error" >> pure []) (\l -> pure l) (maybeResult stmResult)
 
--- printT :: [(String, Int, Int)] -> IO ()
--- printT [] = putStrLn "empty triple list" >> pure()
--- printT (x:xs) = putStrLn (show x) >> printT xs
-
--- printt :: [StmResult BankAccount] -> IO ()
--- printt [] = putStrLn "empty list" >> pure ()
--- printt ((Result bankAcc):xs) = showAccount bankAcc >>= putStrLn >> (printt xs)
--- printt ((Error msg):xs) = putStrLn msg >> (printt xs)
-
 maybeResult :: [StmResult a] -> Maybe [a]
 maybeResult [] = Just []
 maybeResult ((Result x):xs) = fmap (x:) (maybeResult xs)
@@ -174,6 +165,7 @@ updateBalanceOfAccountInBank tVarBankAccounts acc amount f = do
   writeTVar tVarBankAccounts (Map.adjust (\_ -> acc) (ibanNr acc) bankAccounts)
   pure (Result acc)
 
+-- 
 updateStatusOfAccountInBank :: TVar BankAccounts -> BankAccount -> Bool -> STM (StmResult BankAccount)
 updateStatusOfAccountInBank tVarBankAccounts acc newActive = do
     bankAccounts <- readTVar tVarBankAccounts
@@ -184,7 +176,6 @@ updateStatusOfAccountInBank tVarBankAccounts acc newActive = do
     pure (Result acc)
 
 
--- catchSTM :: Exception e => STM a -> (e -> STM a) -> STM a
 getResultOfStmAction :: STM (StmResult a) -> STM (StmResult a)
 getResultOfStmAction stmA = catchSTM stmA handleException
   where handleException (NegativeAmount)         = pure (Error "Fehler: Der Betrag muss grösser als 0 sein.")
@@ -193,14 +184,3 @@ getResultOfStmAction stmA = catchSTM stmA handleException
         handleException (AccountBalanceNotZero)  = pure (Error "Fehler: Der Betrag auf dem Konto ist nicht 0")
         handleException (OwnerLength)            = pure (Error "Fehler: Der Owner muss mind. 3 Zeichen enthalten")
         handleException (OwnerNonAlpha)          = pure (Error "Fehler: Der Owner darf nur gültige Zeichen enthalten: [a-Z]")
-
-showAccount :: BankAccount -> IO String
-showAccount (BankAccount iban owner tVarbal tVarActive) = do
-    bal <- readTVarIO tVarbal
-    isActive <- readTVarIO tVarActive
-    pure ("Bankaccount: id: " ++ iban ++ ", name: " ++ owner ++ ", balance: " ++ show bal ++ ", active: " ++ show isActive)
-
-showAllAccounts :: [BankAccount] -> IO ()
-showAllAccounts accs = do
-    accountsAsText <- mapM showAccount accs
-    mapM_ putStrLn accountsAsText
