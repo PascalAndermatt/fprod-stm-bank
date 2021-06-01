@@ -110,7 +110,7 @@ type alias Model =
     newBalance : String,
     ibanForUpdate : String,
     balanceForUpdate : String,
-    updateMethod : String,
+    balanceUpdateAction : String,
     ibanFrom : String,
     ibanTo : String,
     amountForTransfer : String,
@@ -129,7 +129,7 @@ init =
       newBalance = "",
       ibanForUpdate = "",
       balanceForUpdate = "",
-      updateMethod = "",
+      balanceUpdateAction = "",
       ibanFrom = "",
       ibanTo = "",
       amountForTransfer = "",
@@ -143,12 +143,12 @@ init =
 type Msg = GetAllBankAccounts | 
            BankAccountsResult (Result String (List BankAccount)) | 
            SetOwner String | 
-           SetBalance String |
+           SetBalanceForCreate String |
            CreateBankAccount |
            CreateBankAccountResult (Result String BankAccount) |
            SetIbanForUpdate String |
            SetBalanceForUpdate String |
-           SetUpdateMethod String |
+           SetBalanceUpdateAction String |
            UpdateBalance |
            UpdateBalanceResult (Result String BankAccount) |
            SetIbanFrom String |
@@ -165,44 +165,59 @@ type Msg = GetAllBankAccounts |
            CloseAccountResult (Result String BankAccount)
 
 
+-- ordering & comments
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
   case msg of
-    SetIbanForUpdate iban -> ({model | ibanForUpdate = iban}, Cmd.none)
-    SetBalanceForUpdate bal -> ({model | balanceForUpdate = bal}, Cmd.none)
-    SetOwner owner -> ({model | newOwner = owner}, Cmd.none)
-    SetBalance bal -> ({model | newBalance = bal}, Cmd.none)
-    SetUpdateMethod str -> ({model | updateMethod = str}, Cmd.none)
-    CreateBankAccount -> ({model | newBalance = "", newOwner = ""}, createBankAccount model) -- ?? model update hier nötig ??
-    UpdateBalance -> (model, updateBalance model)
-    GetAllBankAccounts ->
-      ( model, getAllBankAccounts )
-    BankAccountsResult result  -> case result of
-       Ok listWithAccounts -> ({model | bankAccounts = listWithAccounts}, Cmd.none)
-       Err _ -> ({model | bankAccounts = []}, Cmd.none )
-    CreateBankAccountResult result -> case result of
-       Ok _ -> ({model | newOwner = "", newBalance = ""}, getAllBankAccounts)
-       Err message -> ({model | createAccountError = message, newOwner = "", newBalance = ""}, Cmd.none)
-    UpdateBalanceResult result -> case result of
-       Ok _ -> ({model | balanceForUpdate = "", ibanForUpdate = ""}, getAllBankAccounts)
-       Err message -> ({model | updateBalanceError = message, balanceForUpdate = "", ibanForUpdate = ""}, Cmd.none)
+    -- get all accounts
+    GetAllBankAccounts              -> ( model, getAllBankAccounts )
+    BankAccountsResult result       -> case result of
+       Ok accounts -> ({model | bankAccounts = accounts}, Cmd.none)
+       Err _       -> ({model | bankAccounts = []}, Cmd.none )
 
-    SetIbanTo to -> ({model | ibanTo = to}, Cmd.none)
-    SetIbanFrom from -> ({model | ibanFrom = from}, Cmd.none)
-    SetAmountForTransfer amount -> ({model | amountForTransfer = amount}, Cmd.none)
-    Transfer -> (model, transfer model)
-    TransferResult result -> case result of
-       Ok _ -> ({model | ibanFrom = "", ibanTo = "", amountForTransfer = ""}, getAllBankAccounts)
+    -- create account
+    SetOwner o                      -> ({model | newOwner = o}, Cmd.none)
+    SetBalanceForCreate b           -> validateBalanceForCreate b model
+    CreateBankAccount               -> createBankAccount model
+    CreateBankAccountResult result  -> case result of
+       Ok _        -> ({model | newOwner = "", newBalance = ""}, getAllBankAccounts)
+       Err message -> ({model | createAccountError = message, newOwner = "", newBalance = ""}, Cmd.none)
+    DeleteCreatAccountError         -> ({model | createAccountError = ""}, Cmd.none)
+
+    -- update balance of account
+    SetIbanForUpdate i              -> ({model | ibanForUpdate = i}, Cmd.none)
+    SetBalanceForUpdate b           -> ({model | balanceForUpdate = b}, Cmd.none)
+    SetBalanceUpdateAction a        -> ({model | balanceUpdateAction = a}, Cmd.none)
+    UpdateBalance                   -> (model, updateBalance model)
+    UpdateBalanceResult result      -> case result of
+       Ok _        -> ({model | balanceForUpdate = "", ibanForUpdate = ""}, getAllBankAccounts)
+       Err message -> ({model | updateBalanceError = message, balanceForUpdate = "", ibanForUpdate = ""}, Cmd.none)
+    DeleteUpdateBalanceError        -> ({model | updateBalanceError = ""}, Cmd.none)
+
+    -- transfer
+    SetIbanFrom f                   -> ({model | ibanFrom = f}, Cmd.none)
+    SetIbanTo t                     -> ({model | ibanTo = t}, Cmd.none)
+    SetAmountForTransfer a          -> ({model | amountForTransfer = a}, Cmd.none)
+    Transfer                        -> (model, transfer model)
+    TransferResult result           -> case result of
+       Ok _        -> ({model | ibanFrom = "", ibanTo = "", amountForTransfer = ""}, getAllBankAccounts)
        Err message -> ({model | transferError = message, ibanFrom = "", ibanTo = "", amountForTransfer = ""}, Cmd.none)
-    DeleteUpdateBalanceError -> ({model | updateBalanceError = ""}, Cmd.none)
-    DeleteCreatAccountError -> ({model | createAccountError = ""}, Cmd.none)
-    DeleteTransferError -> ({model | transferError = ""}, Cmd.none)
-    SetIbanForClosing iban -> ({model | ibanForClosing = iban}, Cmd.none)
-    CloseAccount -> (model, closeAccount model)
-    DeleteCloseAccountError -> ({model | closeAccountError = ""}, Cmd.none)
-    CloseAccountResult result -> case result of
-       Ok _ -> ({model | ibanForClosing = ""}, getAllBankAccounts)
+    DeleteTransferError             -> ({model | transferError = ""}, Cmd.none)
+    
+    -- close account
+    SetIbanForClosing i             -> ({model | ibanForClosing = i}, Cmd.none)
+    CloseAccount                    -> (model, closeAccount model)
+    CloseAccountResult result       -> case result of
+       Ok _        -> ({model | ibanForClosing = ""}, getAllBankAccounts)
        Err message -> ({model | closeAccountError = message, ibanForClosing = ""}, Cmd.none)
+    DeleteCloseAccountError         -> ({model | closeAccountError = ""}, Cmd.none)
+
+-- input field validation
+validateBalanceForCreate : String -> Model -> (Model, Cmd Msg)
+validateBalanceForCreate bal m = if String.length bal > 7 
+                                      then (m, Cmd.none)
+                                      else ({m | newBalance = String.filter Char.isDigit bal}, Cmd.none)
+
 
 getAllBankAccounts : Cmd Msg
 getAllBankAccounts = Http.get 
@@ -210,18 +225,24 @@ getAllBankAccounts = Http.get
                           expect = expectJson BankAccountsResult decodeBankAccounts 
                         }
 
--- todo: check pre condition: are fields not empty and valid ? then exceute rest call
-createBankAccount : Model -> Cmd Msg
-createBankAccount model = Http.post 
-                        { url = baseUrl,
-                          body = Http.jsonBody (encodeBankAccountRequest {owner = model.newOwner, balance = Maybe.withDefault 0 (String.toInt model.newBalance)}),
-                          expect = expectJson CreateBankAccountResult decodeBankAccount 
-                        }
+createBankAccount : Model -> (Model, Cmd Msg)
+createBankAccount model = if model.newOwner   == "" || 
+                             model.newBalance == ""
+                                then ({model | createAccountError = "Fehler: nicht alle Felder ausgefüllt"}, Cmd.none)
+                                else ( model, Http.post 
+                                                { url = baseUrl,
+                                                  body = Http.jsonBody (encodeBankAccountRequest {
+                                                                                  owner   = model.newOwner, 
+                                                                                  balance = Maybe.withDefault 0 (String.toInt model.newBalance)
+                                                                                }),
+                                                  expect = expectJson CreateBankAccountResult decodeBankAccount 
+                                                } 
+                                      )    
 
 updateBalance : Model -> Cmd Msg
 updateBalance model = Http.post
                       {
-                        url = baseUrl ++ "/" ++ model.ibanForUpdate ++ "/" ++ String.toLower model.updateMethod ++ "?amount=" ++ model.balanceForUpdate,
+                        url = baseUrl ++ "/" ++ model.ibanForUpdate ++ "/" ++ String.toLower model.balanceUpdateAction ++ "?amount=" ++ model.balanceForUpdate,
                         body = Http.emptyBody,
                         expect = expectJson UpdateBalanceResult decodeBankAccount
                       }
@@ -290,7 +311,7 @@ newAccountView model = div [class "container mt-5"] [
     viewBoxTitle "create new Bankaccount",
     haskellBorder [
       labelInputPairMarginBottom (LabelTextInputPair "ownerInput" "Owner" "Peter" SetOwner model.newOwner),
-      labelInputPairMarginBottom (LabelTextInputPair "balanceInput" "Balance" "1000" SetBalance model.newBalance),
+      labelInputPairMarginBottom (LabelTextInputPair "balanceInput" "Balance" "1000" SetBalanceForCreate model.newBalance),
       createHaskellButton "create" CreateBankAccount,
       customErrorView model.createAccountError DeleteCreatAccountError
     ]
@@ -305,7 +326,7 @@ updateBalanceView model = div [class "container mt-5"] [
     haskellBorder [
       labelInputPairMarginBottom (LabelTextInputPair "ibanForUpdate" "IBAN" ibanPlaceholder SetIbanForUpdate model.ibanForUpdate),
       labelInputPairMarginBottom (LabelTextInputPair "amountForUpdate" "Balance" "1000" SetBalanceForUpdate model.balanceForUpdate),
-      select [class "form-select mb-4", onInput SetUpdateMethod] [
+      select [class "form-select mb-4", onInput SetBalanceUpdateAction] [
         option [selected True ] [text "choose update action"],
         option [value "withdraw"] [text "withdraw"],
         option [value "deposit"] [text "deposit"]
