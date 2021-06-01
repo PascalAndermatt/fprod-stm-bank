@@ -22,6 +22,7 @@ main :: IO ()
 main = do
   accs <- StmBank.getInitialAccounts -- create initial account list
   bank <- atomically (StmBank.createInitialBank accs) -- create bank with accounts
+  let tVarBankAccounts = StmBank.accounts bank
   
   scotty 4000 $ do
     middleware logStdoutDev
@@ -29,19 +30,17 @@ main = do
 
     get "/" $ file "static/index.html"
 
-
     get "/accounts" $ do
-      bankAccounts <- liftIO (readTVarIO (StmBank.accounts bank))
+      bankAccounts <- liftIO (readTVarIO tVarBankAccounts)
       response <- runStmActionAtomically (mapM StmBank.toBankAccountResponse (Map.elems bankAccounts))
       json (toJSON response)
 
     get "/accounts/:id" $ do
-      accountId <- param "id"
-      bankAccounts <- liftIO (readTVarIO (StmBank.accounts bank))
-      let maybeAccount = StmBank.findBankAccountById accountId bankAccounts
+      iban <- param "id"
+
       withAccount (\acc -> do
         response <- runStmActionAtomically (StmBank.toBankAccountResponse acc)
-        json (toJSON response)) maybeAccount
+        json (toJSON response)) iban tVarBankAccounts
 
     post "/accounts" $ do
       bankAccountRequest <- jsonData :: ActionM StmBank.BankAccountRequest
@@ -55,41 +54,16 @@ main = do
         )
       
     post "/accounts/:id/withdraw" $ do
-      iban <- param "id"
-      amount <- param "amount"
-
-      let tVarBankAccounts = (StmBank.accounts bank)
-      bankAccounts <- liftIO (readTVarIO tVarBankAccounts)
-      let maybeAccount = StmBank.findBankAccountById iban bankAccounts
-
-      withAccount (\acc -> do
-          result <- runStmActionAtomically (StmBank.getResultOfStmAction (StmBank.updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.withdraw))
-          createResponse result (\res -> do
-            response <- runStmActionAtomically (StmBank.toBankAccountResponse res)
-            json (toJSON response))
-        ) maybeAccount
+      handleBalanceUpdateRequest tVarBankAccounts StmBank.withdraw
 
     post "/accounts/:id/deposit" $ do
-      iban <- param "id"
-      amount <- param "amount"
-
-      let tVarBankAccounts = (StmBank.accounts bank)
-      bankAccounts <- liftIO (readTVarIO tVarBankAccounts)
-
-      let maybeAccount = StmBank.findBankAccountById iban bankAccounts
-
-      withAccount (\acc -> do
-          result <- runStmActionAtomically (StmBank.getResultOfStmAction (StmBank.updateBalanceOfAccountInBank tVarBankAccounts acc amount StmBank.deposit))
-          createResponse result (\res -> do
-            response <- runStmActionAtomically (StmBank.toBankAccountResponse res)
-            json (toJSON response))
-        ) maybeAccount
+      handleBalanceUpdateRequest tVarBankAccounts StmBank.deposit
     
     post "/accounts/transfer" $ do
       transferRequest <- jsonData :: ActionM StmBank.TransferRequest
       let amount = StmBank.amount transferRequest
 
-      bankAccounts <- liftIO (readTVarIO (StmBank.accounts bank))
+      bankAccounts <- liftIO (readTVarIO tVarBankAccounts)
 
       maybe (status status412 >> json (StmUtil.stringToJson "Fehler: mind. 1 Konto nicht gefunden")) (\(from,to) -> do
           result <- runStmActionAtomically (StmBank.getResultOfStmAction (StmBank.transfer from to amount))
@@ -99,19 +73,20 @@ main = do
     post "/accounts/close/:id" $ do
       iban <- param "id"
 
-      let tVarBankAccounts = (StmBank.accounts bank)
-      bankAccounts <- liftIO (readTVarIO tVarBankAccounts)
-      let maybeAccount = StmBank.findBankAccountById iban bankAccounts
-
       withAccount (\acc -> do
           result <- runStmActionAtomically ( StmBank.getResultOfStmAction (StmBank.updateStatusOfAccountInBank tVarBankAccounts acc False))
           createResponse result (\res -> do
             response <- runStmActionAtomically (StmBank.toBankAccountResponse res)
             json (toJSON response))
-        ) maybeAccount
+        ) iban tVarBankAccounts
 
-withAccount :: (StmBank.BankAccount -> ActionM()) -> Maybe StmBank.BankAccount -> ActionM ()
-withAccount = maybe (status status404 >> json (StmUtil.stringToJson "Konto wurde nicht gefunden"))
+
+withAccount :: (StmBank.BankAccount -> ActionM()) -> String -> TVar StmBank.BankAccounts -> ActionM ()
+withAccount handleResult iban tVarBankAccounts = do
+              bankAccounts <- liftIO (readTVarIO tVarBankAccounts)
+              let maybeAccount = StmBank.findBankAccountById iban bankAccounts
+  
+              maybe (status status404 >> json (StmUtil.stringToJson "Konto wurde nicht gefunden")) handleResult maybeAccount
 
 createResponse :: StmBank.StmResult a -> (a -> ActionM ()) -> ActionM ()
 createResponse (StmBank.Error message) _ = (do
@@ -121,3 +96,16 @@ createResponse (StmBank.Result r) f = f r
 
 runStmActionAtomically :: STM a -> ActionM a
 runStmActionAtomically stmAction = liftIO (atomically stmAction)
+
+
+handleBalanceUpdateRequest :: TVar StmBank.BankAccounts -> StmBank.BalanceUpdate -> ActionM ()
+handleBalanceUpdateRequest tVarBankAccounts balanceUpdateAction = do
+      iban <- param "id"
+      amount <- param "amount"
+      
+      withAccount (\acc -> do
+          result <- runStmActionAtomically (StmBank.getResultOfStmAction (StmBank.updateBalanceOfAccountInBank tVarBankAccounts acc amount balanceUpdateAction))
+          createResponse result (\res -> do
+            response <- runStmActionAtomically (StmBank.toBankAccountResponse res)
+            json (toJSON response))
+        ) iban tVarBankAccounts

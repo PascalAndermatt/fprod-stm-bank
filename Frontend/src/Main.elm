@@ -159,7 +159,7 @@ type Msg = GetAllBankAccounts |
            Transfer |
            TransferResult (Result String ()) |
            DeleteUpdateBalanceError |
-           DeleteCreatAccountError |
+           DeleteCreateAccountError |
            DeleteTransferError |
            SetIbanForClosing String |
            CloseAccount |
@@ -182,9 +182,9 @@ update msg model =
     SetBalanceForCreate b           -> validateBalanceForCreate b model
     CreateBankAccount               -> createBankAccount model
     CreateBankAccountResult result  -> case result of
-       Ok _        -> ({model | newOwner = "", newBalance = ""}, getAllBankAccounts)
-       Err message -> ({model | createAccountError = message, newOwner = "", newBalance = ""}, Cmd.none)
-    DeleteCreatAccountError         -> ({model | createAccountError = ""}, Cmd.none)
+       Ok _        -> ({model | newOwner = "", newBalance = "", createAccountError = ""}, getAllBankAccounts)
+       Err message -> ({model | newOwner = "", newBalance = "", createAccountError = message}, Cmd.none)
+    DeleteCreateAccountError        -> ({model | createAccountError = ""}, Cmd.none)
 
     -- update balance of account
     SetIbanForUpdate i              -> ({model | ibanForUpdate = i}, Cmd.none)
@@ -192,8 +192,8 @@ update msg model =
     SetBalanceUpdateAction a        -> ({model | balanceUpdateAction = a}, Cmd.none)
     UpdateBalance                   -> updateBalance model
     UpdateBalanceResult result      -> case result of
-       Ok _        -> ({model | balanceForUpdate = "", ibanForUpdate = ""}, getAllBankAccounts)
-       Err message -> ({model | updateBalanceError = message, balanceForUpdate = "", ibanForUpdate = ""}, Cmd.none)
+       Ok _        -> ({model | balanceForUpdate = "", ibanForUpdate = "", updateBalanceError = ""}, getAllBankAccounts)
+       Err message -> ({model | balanceForUpdate = "", ibanForUpdate = "", updateBalanceError = message}, Cmd.none)
     DeleteUpdateBalanceError        -> ({model | updateBalanceError = ""}, Cmd.none)
 
     -- transfer
@@ -202,16 +202,16 @@ update msg model =
     SetAmountForTransfer a          -> validateAmountForTransfer a model
     Transfer                        -> transfer model
     TransferResult result           -> case result of
-       Ok _        -> ({model | ibanFrom = "", ibanTo = "", amountForTransfer = ""}, getAllBankAccounts)
-       Err message -> ({model | transferError = message, ibanFrom = "", ibanTo = "", amountForTransfer = ""}, Cmd.none)
+       Ok _        -> ({model | ibanFrom = "", ibanTo = "", amountForTransfer = "", transferError = ""}, getAllBankAccounts)
+       Err message -> ({model | ibanFrom = "", ibanTo = "", amountForTransfer = "", transferError = message}, Cmd.none)
     DeleteTransferError             -> ({model | transferError = ""}, Cmd.none)
     
     -- close account
     SetIbanForClosing i             -> ({model | ibanForClosing = i}, Cmd.none)
     CloseAccount                    -> closeAccount model
     CloseAccountResult result       -> case result of
-       Ok _        -> ({model | ibanForClosing = ""}, getAllBankAccounts)
-       Err message -> ({model | closeAccountError = message, ibanForClosing = ""}, Cmd.none)
+       Ok _        -> ({model | ibanForClosing = "", closeAccountError = ""}, getAllBankAccounts)
+       Err message -> ({model | ibanForClosing = "", closeAccountError = message}, Cmd.none)
     DeleteCloseAccountError         -> ({model | closeAccountError = ""}, Cmd.none)
 
 -- input field validation
@@ -340,7 +340,7 @@ newAccountView model = div [class "container mt-5"] [
       labelInputPairMarginBottom (LabelTextInputPair "ownerInput" "Owner" "Peter" SetOwner model.newOwner),
       labelInputPairMarginBottom (LabelTextInputPair "balanceInput" "Balance" "1000" SetBalanceForCreate model.newBalance),
       createHaskellButton "create" CreateBankAccount,
-      customErrorView model.createAccountError DeleteCreatAccountError
+      customErrorView model.createAccountError DeleteCreateAccountError
     ]
   ]
 
