@@ -186,9 +186,9 @@ update msg model =
 
     -- update balance of account
     SetIbanForUpdate i              -> ({model | ibanForUpdate = i}, Cmd.none)
-    SetBalanceForUpdate b           -> ({model | balanceForUpdate = b}, Cmd.none)
+    SetBalanceForUpdate b           -> validateBalanceForUpdate b model
     SetBalanceUpdateAction a        -> ({model | balanceUpdateAction = a}, Cmd.none)
-    UpdateBalance                   -> (model, updateBalance model)
+    UpdateBalance                   -> updateBalance model
     UpdateBalanceResult result      -> case result of
        Ok _        -> ({model | balanceForUpdate = "", ibanForUpdate = ""}, getAllBankAccounts)
        Err message -> ({model | updateBalanceError = message, balanceForUpdate = "", ibanForUpdate = ""}, Cmd.none)
@@ -197,8 +197,8 @@ update msg model =
     -- transfer
     SetIbanFrom f                   -> ({model | ibanFrom = f}, Cmd.none)
     SetIbanTo t                     -> ({model | ibanTo = t}, Cmd.none)
-    SetAmountForTransfer a          -> ({model | amountForTransfer = a}, Cmd.none)
-    Transfer                        -> (model, transfer model)
+    SetAmountForTransfer a          -> validateAmountForTransfer a model
+    Transfer                        -> transfer model
     TransferResult result           -> case result of
        Ok _        -> ({model | ibanFrom = "", ibanTo = "", amountForTransfer = ""}, getAllBankAccounts)
        Err message -> ({model | transferError = message, ibanFrom = "", ibanTo = "", amountForTransfer = ""}, Cmd.none)
@@ -206,7 +206,7 @@ update msg model =
     
     -- close account
     SetIbanForClosing i             -> ({model | ibanForClosing = i}, Cmd.none)
-    CloseAccount                    -> (model, closeAccount model)
+    CloseAccount                    -> closeAccount model
     CloseAccountResult result       -> case result of
        Ok _        -> ({model | ibanForClosing = ""}, getAllBankAccounts)
        Err message -> ({model | closeAccountError = message, ibanForClosing = ""}, Cmd.none)
@@ -214,11 +214,18 @@ update msg model =
 
 -- input field validation
 validateBalanceForCreate : String -> Model -> (Model, Cmd Msg)
-validateBalanceForCreate bal m = if String.length bal > 7 
-                                      then (m, Cmd.none)
-                                      else ({m | newBalance = String.filter Char.isDigit bal}, Cmd.none)
+validateBalanceForCreate bal m = validateBalanceLength m {m | newBalance = String.filter Char.isDigit bal} bal
 
+validateBalanceForUpdate : String -> Model -> (Model, Cmd Msg)
+validateBalanceForUpdate bal m = validateBalanceLength m {m | balanceForUpdate = String.filter Char.isDigit bal} bal
 
+validateAmountForTransfer : String -> Model -> (Model, Cmd Msg)
+validateAmountForTransfer bal m = validateBalanceLength m {m | amountForTransfer = String.filter Char.isDigit bal} bal
+
+validateBalanceLength : Model -> Model -> String -> (Model, Cmd Msg)
+validateBalanceLength oldM newM bal = if String.length bal > 7 
+                                        then (oldM, Cmd.none)
+                                        else (newM, Cmd.none)
 getAllBankAccounts : Cmd Msg
 getAllBankAccounts = Http.get 
                         { url = baseUrl,
@@ -226,26 +233,60 @@ getAllBankAccounts = Http.get
                         }
 
 createBankAccount : Model -> (Model, Cmd Msg)
-createBankAccount model = if model.newOwner   == "" || 
-                             model.newBalance == ""
-                                then ({model | createAccountError = "Fehler: nicht alle Felder ausgefüllt"}, Cmd.none)
-                                else ( model, Http.post 
-                                                { url = baseUrl,
-                                                  body = Http.jsonBody (encodeBankAccountRequest {
-                                                                                  owner   = model.newOwner, 
-                                                                                  balance = Maybe.withDefault 0 (String.toInt model.newBalance)
-                                                                                }),
-                                                  expect = expectJson CreateBankAccountResult decodeBankAccount 
-                                                } 
-                                      )    
+createBankAccount model = case isAnyInputFieldEmpty [model.newOwner, model.newBalance] of
+                                Ok _        -> ( model, Http.post 
+                                                  { url = baseUrl,
+                                                    body = Http.jsonBody (encodeBankAccountRequest {
+                                                                                    owner   = model.newOwner, 
+                                                                                    balance = Maybe.withDefault 0 (String.toInt model.newBalance)
+                                                                                  }),
+                                                    expect = expectJson CreateBankAccountResult decodeBankAccount 
+                                                  })
+                                Err message -> ({model | createAccountError = message}, Cmd.none)
 
-updateBalance : Model -> Cmd Msg
-updateBalance model = Http.post
-                      {
-                        url = baseUrl ++ "/" ++ model.ibanForUpdate ++ "/" ++ String.toLower model.balanceUpdateAction ++ "?amount=" ++ model.balanceForUpdate,
-                        body = Http.emptyBody,
-                        expect = expectJson UpdateBalanceResult decodeBankAccount
-                      }
+isAnyInputFieldEmpty : List String -> Result String ()
+isAnyInputFieldEmpty fields = if List.any String.isEmpty fields
+                                    then Err "Fehler: nicht alle Felder ausgefüllt"
+                                    else Ok ()
+
+
+
+updateBalance : Model -> (Model, Cmd Msg)
+updateBalance model = case validateBalanceUpdateRequest model of
+                        Ok _        ->  (model, Http.post
+                                            { url = baseUrl ++ "/" ++ model.ibanForUpdate ++ "/" ++ String.toLower model.balanceUpdateAction ++ "?amount=" ++ model.balanceForUpdate,
+                                              body = Http.emptyBody,
+                                              expect = expectJson UpdateBalanceResult decodeBankAccount
+                                            })
+                        Err message -> ({model | updateBalanceError = message}, Cmd.none)
+
+transfer : Model -> (Model, Cmd Msg)
+transfer model = case isAnyInputFieldEmpty [model.ibanFrom, model.ibanTo, model.amountForTransfer] of
+                          Ok _ -> (model, Http.post
+                                    {
+                                      url = baseUrl ++ "/transfer",
+                                      body = Http.jsonBody (encodeTransferRequest {from = model.ibanFrom, to = model.ibanTo, amount = (Maybe.withDefault 0 (String.toInt model.amountForTransfer))}),
+                                      expect = expectJson TransferResult (succeed ()) 
+                                    })
+                          Err message -> ({model | transferError = message}, Cmd.none)
+
+validateBalanceUpdateRequest : Model -> Result String ()
+validateBalanceUpdateRequest model = case isAnyInputFieldEmpty [model.ibanForUpdate, model.balanceForUpdate] of
+                                              Ok _ -> if List.member model.balanceUpdateAction [str_WITHDRAW, str_DEPOSIT]
+                                                            then Ok ()
+                                                            else Err "Fehler: keine update action ausgewählt"
+                                              Err message -> Err message
+
+closeAccount : Model -> (Model, Cmd Msg)
+closeAccount model = case isAnyInputFieldEmpty [model.ibanForClosing] of
+                            Ok _ -> (model, Http.post 
+                                        {
+                                          url = (baseUrl ++ "/close/" ++ model.ibanForClosing),
+                                          body = Http.emptyBody,
+                                          expect = expectJson CloseAccountResult decodeBankAccount
+                                        })
+                            Err message -> ({model | closeAccountError = message}, Cmd.none)
+                
 
 expectJson : (Result String a -> msg) -> Decoder a -> Expect msg
 expectJson toMsg decoder = 
@@ -270,21 +311,7 @@ expectJson toMsg decoder =
 convertBody : String -> String
 convertBody body = if body == "" then "{}" else body
 
-transfer : Model -> Cmd Msg
-transfer model = Http.post
-                  {
-                    url = baseUrl ++ "/transfer",
-                    body = Http.jsonBody (encodeTransferRequest {from = model.ibanFrom, to = model.ibanTo, amount = (Maybe.withDefault 0 (String.toInt model.amountForTransfer))}),
-                    expect = expectJson TransferResult (succeed ()) 
-                  }
 
-closeAccount : Model -> Cmd Msg
-closeAccount model = Http.post 
-                      {
-                        url = (baseUrl ++ "/close/" ++ model.ibanForClosing),
-                        body = Http.emptyBody,
-                        expect = expectJson CloseAccountResult decodeBankAccount
-                      }
 
 view : Model -> Html Msg
 view model = div [class "mb-5"] [
@@ -328,13 +355,22 @@ updateBalanceView model = div [class "container mt-5"] [
       labelInputPairMarginBottom (LabelTextInputPair "amountForUpdate" "Balance" "1000" SetBalanceForUpdate model.balanceForUpdate),
       select [class "form-select mb-4", onInput SetBalanceUpdateAction] [
         option [selected True ] [text "choose update action"],
-        option [value "withdraw"] [text "withdraw"],
-        option [value "deposit"] [text "deposit"]
+        option [value str_WITHDRAW] [text str_WITHDRAW],
+        option [value str_DEPOSIT] [text str_DEPOSIT]
       ],
       createHaskellButton "update balance" UpdateBalance,
       customErrorView model.updateBalanceError DeleteUpdateBalanceError
     ]
   ]
+
+str_WITHDRAW : String
+str_WITHDRAW = "withdraw"
+
+str_DEPOSIT : String
+str_DEPOSIT = "deposit"
+
+
+type BalanceUpdateAction = Withdrwa | Deposit 
 
 viewBoxTitle : String -> Html Msg
 viewBoxTitle t = h3 [] [text t]
