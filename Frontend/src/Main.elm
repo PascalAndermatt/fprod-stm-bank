@@ -328,11 +328,11 @@ view model = div [class "mb-5"] [
 
 getAllAccountsView : Model -> Html Msg
 getAllAccountsView model = div [ class "container mt-5"] [
-        viewBoxTitle "Bankaccounts",
+        viewBoxTitle "BankAccounts",
         haskellBorder [
             table [class "table"] [
               thead [] [
-                tr [] (List.map (\str -> th [scope "col"] [text str]) ["owner", "IBAN", "active", "balance"])
+                tr [] (List.map (\str -> th [scope "col"] [text str]) ["owner", "iban", "active", "balance"])
               ],
               tbody [] (List.map createTableRowFromBankAccount model.bankAccounts)
             ],
@@ -343,10 +343,10 @@ getAllAccountsView model = div [ class "container mt-5"] [
   
 newAccountView : Model -> Html Msg
 newAccountView model = div [class "container mt-5"] [
-    viewBoxTitle "create new Bankaccount",
+    viewBoxTitle "Create BankAccount",
     haskellBorder [
-      labelInputPairMarginBottom (LabelTextInputPair "ownerInput" "Owner" "Peter" SetOwner model.newOwner),
-      labelInputPairMarginBottom (LabelTextInputPair "balanceInput" "Balance" "1000" SetBalanceForCreate model.newBalance),
+      labelInputPairMarginBottom (LabelTextInputPair "ownerInput" "owner" "Peter" SetOwner model.newOwner),
+      labelInputPairMarginBottom (LabelTextInputPair "balanceInput" "balance" "1000" SetBalanceForCreate model.newBalance),
       createHaskellButton "create" CreateBankAccount,
       customErrorView model.createAccountError DeleteCreateAccountError
     ]
@@ -357,10 +357,10 @@ ibanPlaceholder = "CH2707888954202552370TUR"
 
 updateBalanceView : Model -> Html Msg
 updateBalanceView model = div [class "container mt-5"] [
-    viewBoxTitle "update balance of Bankaccount",
+    viewBoxTitle "Update Balance",
     haskellBorder [
-      labelInputPairMarginBottom (LabelTextInputPair "ibanForUpdate" "IBAN" ibanPlaceholder SetIbanForUpdate model.ibanForUpdate),
-      labelInputPairMarginBottom (LabelTextInputPair "amountForUpdate" "Balance" "1000" SetBalanceForUpdate model.balanceForUpdate),
+      labelInputPairMarginBottom (LabelTextInputPair "ibanForUpdate" "iban" ibanPlaceholder SetIbanForUpdate model.ibanForUpdate),
+      labelInputPairMarginBottom (LabelTextInputPair "amountForUpdate" "amount" "1000" SetBalanceForUpdate model.balanceForUpdate),
       select [class "form-select mb-4", onInput SetBalanceUpdateAction] [
         option [selected True ] [text "choose update action"],
         option [value str_WITHDRAW] [text str_WITHDRAW],
@@ -395,7 +395,7 @@ customErrorView errorMsg deleteHandler = if (errorMsg /= "")
 
 transferView : Model -> Html Msg
 transferView model = div [class "container mt-5"] [
-    viewBoxTitle "transfer",
+    viewBoxTitle "Transfer",
     haskellBorder [
       labelInputPairMarginBottom (LabelTextInputPair "ibanFrom" "from" ibanPlaceholder SetIbanFrom model.ibanFrom),
       labelInputPairMarginBottom (LabelTextInputPair "ibanTo" "to" ibanPlaceholder SetIbanTo model.ibanTo),
@@ -407,7 +407,7 @@ transferView model = div [class "container mt-5"] [
 
 closeAccountView : Model -> Html Msg
 closeAccountView model = div [class "container mt-5"] [
-    viewBoxTitle "close account",
+    viewBoxTitle "Close BankAccount",
     haskellBorder [
       labelInputPairMarginBottom (LabelTextInputPair "ibanForClosing" "iban" ibanPlaceholder SetIbanForClosing model.ibanForClosing),
       createHaskellButton "close account" CloseAccount,
@@ -458,7 +458,6 @@ createNavBar = div [class "mb-4", style "background-color" "#5E5184", style "hei
                 h6 [class "col-12 align-self-end"] [text "Turan Ledermann"]
               ]
             ]
-            
           ]
       ]
   ]
