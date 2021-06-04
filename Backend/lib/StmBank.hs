@@ -29,7 +29,7 @@ import           Control.Exception (Exception)
 -- Bank Data Types
 data Bank                = Bank { accounts:: TVar BankAccounts}
 type BankAccounts        = Map String BankAccount
-data BankAccount         = BankAccount { ibanNr :: String, name :: String, balance :: TVar Int, active :: TVar Bool }
+data BankAccount         = BankAccount { iban :: String, name :: String, balance :: TVar Int, active :: TVar Bool }
 
 type BalanceUpdate       = BankAccount -> Int -> STM ()
 data StmResult a         = Error String | Result a
@@ -41,14 +41,14 @@ data BankException = NegativeAmount | AccountOverdrawn |
 instance Exception BankException
 
 -- REST DTO's (Request/Response) Types
-data BankAccountResponse = BankAccountResponse { ibanNrR :: String, nameR :: String, balanceR :: Int, activeR :: Bool }
-data BankAccountRequest  = BankAccountRequest {nameRequest:: String, balanceRequest:: Int }
+data BankAccountResponse = BankAccountResponse { res_iban :: String, res_owner :: String, res_balance :: Int, res_active :: Bool }
+data BankAccountRequest  = BankAccountRequest {req_owner:: String, req_balance:: Int }
 data TransferRequest     = TransferRequest {from :: String, to :: String, amount :: Int}
 
 -- JSON converters
 instance ToJSON BankAccountResponse where
   toJSON (BankAccountResponse iban owner bal active) = object [
-    "ibanNr"    .= (StmUtil.stringToJson iban), 
+    "iban"      .= (StmUtil.stringToJson iban), 
     "owner"     .= (StmUtil.stringToJson owner), 
     "balance"   .= (toJSON bal),
     "active"    .= (toJSON active)]
@@ -86,7 +86,7 @@ getInitialAccounts = do
         randomSalt <- StmUtil.generateRandomSalt
         pure (o,b,randomSalt)) [("Pascal", 100), ("Turan", 200)]
     stmResult <- atomically (mapM (\tri -> getResultOfStmAction (createAccountFromTriple tri)) result)
-    maybe (putStrLn "initial bankAccount error" >> pure []) (\l -> pure l) (maybeResult stmResult)
+    maybe (putStrLn "initial BankAccount error" >> pure []) (\l -> pure l) (maybeResult stmResult)
 
 maybeResult :: [StmResult a] -> Maybe [a]
 maybeResult [] = Just []
@@ -146,13 +146,13 @@ transfer accountA accountB amount = do
 addBankAccount :: TVar BankAccounts -> BankAccount -> STM ()
 addBankAccount tVarBankAccounts newAccount = do
     bankAccounts <- readTVar tVarBankAccounts
-    writeTVar tVarBankAccounts (Map.insert (ibanNr newAccount) newAccount bankAccounts)
+    writeTVar tVarBankAccounts (Map.insert (iban newAccount) newAccount bankAccounts)
 
 createInitialBank :: [BankAccount] -> STM Bank
 createInitialBank bankAccounts =  do
                         tVarBankAccounts <- newTVar (Map.fromList (zip keys bankAccounts))
                         pure (Bank tVarBankAccounts)
-                        where keys = map ibanNr bankAccounts
+                        where keys = map iban bankAccounts
 
 createIban :: Int -> String -> String
 createIban randomNumber owner = "CH" ++ (show hashVal) ++ (map toUpper (take 3 owner))
@@ -162,7 +162,7 @@ updateBalanceOfAccountInBank :: TVar BankAccounts -> BankAccount -> Int -> Balan
 updateBalanceOfAccountInBank tVarBankAccounts acc amount f = do
   bankAccounts <- readTVar tVarBankAccounts
   f acc amount
-  writeTVar tVarBankAccounts (Map.adjust (\_ -> acc) (ibanNr acc) bankAccounts)
+  writeTVar tVarBankAccounts (Map.adjust (\_ -> acc) (iban acc) bankAccounts)
   pure (Result acc)
 
 -- 
@@ -172,7 +172,7 @@ updateStatusOfAccountInBank tVarBankAccounts acc newActive = do
     bal <- readTVar (balance acc)
     when (not newActive && bal /= 0) (throwSTM AccountBalanceNotZero)
     writeTVar (active acc) newActive
-    writeTVar tVarBankAccounts (Map.adjust (\_ -> acc) (ibanNr acc) bankAccounts)
+    writeTVar tVarBankAccounts (Map.adjust (\_ -> acc) (iban acc) bankAccounts)
     pure (Result acc)
 
 

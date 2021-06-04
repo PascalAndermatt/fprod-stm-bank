@@ -66,10 +66,11 @@ encodeBankAccountRequest record =
         ]
 
 type alias BankAccount =
-    { balance : Int
-    , active : Bool
-    , owner : String
-    , ibanNr : String
+    { 
+      iban : String,
+      owner : String,
+      balance : Int,
+      active : Bool      
     }
 
 decodeBankAccounts : Json.Decode.Decoder (List BankAccount)
@@ -78,18 +79,20 @@ decodeBankAccounts = Json.Decode.list decodeBankAccount
 decodeBankAccount : Json.Decode.Decoder BankAccount
 decodeBankAccount =
     Json.Decode.map4 BankAccount
+        (field "iban" Json.Decode.string)
+        (field "owner" Json.Decode.string)
         (field "balance" Json.Decode.int)
         (field "active" Json.Decode.bool)
-        (field "owner" Json.Decode.string)
-        (field "ibanNr" Json.Decode.string)
+        
 
 encodeBankAccount : BankAccount -> Json.Encode.Value
 encodeBankAccount record =
     Json.Encode.object
-        [ ("balance",  Json.Encode.int <| record.balance)
-        , ("active",  Json.Encode.bool <| record.active)
-        , ("owner",  Json.Encode.string <| record.owner)
-        , ("ibanNr",  Json.Encode.string <| record.ibanNr)
+        [ 
+          ("iban",  Json.Encode.string <| record.iban),
+          ("owner",  Json.Encode.string <| record.owner),
+          ("balance",  Json.Encode.int <| record.balance),
+          ("active",  Json.Encode.bool <| record.active) 
         ]
 
 -- konstante
@@ -437,7 +440,7 @@ getAccountStatus acc = if acc.active then "active" else "inactive"
 createTableRowFromBankAccount : BankAccount -> Html Msg
 createTableRowFromBankAccount acc = tr [] [
     td [] [text acc.owner],
-    td [] [text acc.ibanNr],
+    td [] [text acc.iban],
     td [] [text (getAccountStatus acc)],
     td [] [text (String.fromInt acc.balance)]
   ]
