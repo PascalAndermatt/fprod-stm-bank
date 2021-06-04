@@ -85,7 +85,6 @@ withAccount :: (StmBank.BankAccount -> ActionM()) -> String -> TVar StmBank.Bank
 withAccount handleResult iban tVarBankAccounts = do
               bankAccounts <- liftIO (readTVarIO tVarBankAccounts)
               let maybeAccount = StmBank.findBankAccountById iban bankAccounts
-  
               maybe (status status404 >> json (StmUtil.stringToJson "Fehler: Konto wurde nicht gefunden")) handleResult maybeAccount
 
 createResponse :: StmBank.StmResult a -> (a -> ActionM ()) -> ActionM ()

@@ -18,53 +18,35 @@ import Platform.Cmd exposing (Cmd)
 import Http
 import Http
 
-type alias TransferRequest =
-    { from : String
-    , to : String
-    , amount : Int
+
+
+-- STRING CONSTANTS
+baseUrl : String
+baseUrl = "http://localhost:4000/accounts"
+
+ibanPlaceholder : String
+ibanPlaceholder = "CH2707888954202552370AAA"
+
+str_WITHDRAW : String
+str_WITHDRAW = "withdraw"
+
+str_DEPOSIT : String
+str_DEPOSIT = "deposit"
+
+
+
+-- MAIN ENTRYPOINT
+main : Program () Model Msg
+main =
+  Browser.element
+    { 
+      init = \_ -> init, 
+      update = update, 
+      view = view, 
+      subscriptions = \_ -> Sub.none
     }
 
-type alias LabelTextInputPair = 
-    {
-      labelId : String,
-      labelText : String,
-      inputPlaceholder : String,
-      onInputHandler : String -> Msg,
-      valueModel : String
-    }
-
-decodeTransferRequest : Json.Decode.Decoder TransferRequest
-decodeTransferRequest =
-    Json.Decode.map3 TransferRequest
-        (field "from" Json.Decode.string)
-        (field "to" Json.Decode.string)
-        (field "amount" Json.Decode.int)
-
-encodeTransferRequest : TransferRequest -> Json.Encode.Value
-encodeTransferRequest record =
-    Json.Encode.object
-        [ ("from",  Json.Encode.string <| record.from)
-        , ("to",  Json.Encode.string <| record.to)
-        , ("amount",  Json.Encode.int <| record.amount)]
-
-type alias BankAccountRequest =
-    { owner : String
-    , balance : Int
-    }
-
-decodeBankAccountRequest : Json.Decode.Decoder BankAccountRequest
-decodeBankAccountRequest =
-    Json.Decode.map2 BankAccountRequest
-        (field "owner" Json.Decode.string)
-        (field "balance" Json.Decode.int)
-
-encodeBankAccountRequest : BankAccountRequest -> Json.Encode.Value
-encodeBankAccountRequest record =
-    Json.Encode.object
-        [ ("owner",  Json.Encode.string <| record.owner)
-        , ("balance",  Json.Encode.int <| record.balance)
-        ]
-
+-- define BankAccount
 type alias BankAccount =
     { 
       iban : String,
@@ -73,18 +55,59 @@ type alias BankAccount =
       active : Bool      
     }
 
-decodeBankAccounts : Json.Decode.Decoder (List BankAccount)
-decodeBankAccounts = Json.Decode.list decodeBankAccount
 
-decodeBankAccount : Json.Decode.Decoder BankAccount
-decodeBankAccount =
-    Json.Decode.map4 BankAccount
-        (field "iban" Json.Decode.string)
+
+-- JSON DATA CONVERSION
+-- define TransferRequest
+type alias TransferRequest =
+    { 
+      from    : String, 
+      to      : String, 
+      amount  : Int
+    }
+
+-- encode TranserRequest object to JSON data
+encodeTransferRequest : TransferRequest -> Json.Encode.Value
+encodeTransferRequest record =
+    Json.Encode.object
+        [ 
+          ("from",  Json.Encode.string <| record.from), 
+          ("to",  Json.Encode.string <| record.to), 
+          ("amount",  Json.Encode.int <| record.amount)
+        ]
+
+-- decode JSON data to TranserRequest object
+decodeTransferRequest : Json.Decode.Decoder TransferRequest
+decodeTransferRequest =
+    Json.Decode.map3 TransferRequest
+        (field "from" Json.Decode.string)
+        (field "to" Json.Decode.string)
+        (field "amount" Json.Decode.int)
+
+-- define BankAccountRequest
+type alias BankAccountRequest =
+    { 
+      owner   : String, 
+      balance : Int
+    }
+
+-- encode BankAccountRequest object to JSON data
+encodeBankAccountRequest : BankAccountRequest -> Json.Encode.Value
+encodeBankAccountRequest record =
+    Json.Encode.object
+        [ 
+          ("owner",  Json.Encode.string <| record.owner), 
+          ("balance",  Json.Encode.int <| record.balance)
+        ]
+
+-- decode JSON data to BankAccountRequest object 
+decodeBankAccountRequest : Json.Decode.Decoder BankAccountRequest
+decodeBankAccountRequest =
+    Json.Decode.map2 BankAccountRequest
         (field "owner" Json.Decode.string)
         (field "balance" Json.Decode.int)
-        (field "active" Json.Decode.bool)
-        
 
+-- encode BankAccount object to JSON data
 encodeBankAccount : BankAccount -> Json.Encode.Value
 encodeBankAccount record =
     Json.Encode.object
@@ -95,38 +118,42 @@ encodeBankAccount record =
           ("active",  Json.Encode.bool <| record.active) 
         ]
 
--- konstante
-baseUrl : String
-baseUrl = "http://localhost:4000/accounts"
+-- decode JSON data to BankAccount object
+decodeBankAccount : Json.Decode.Decoder BankAccount
+decodeBankAccount =
+    Json.Decode.map4 BankAccount
+        (field "iban" Json.Decode.string)
+        (field "owner" Json.Decode.string)
+        (field "balance" Json.Decode.int)
+        (field "active" Json.Decode.bool)
 
-main : Program () Model Msg
-main =
-  Browser.element
-    { init = \_ -> init
-    , update = update
-    , view = view
-    , subscriptions = \_ -> Sub.none
-    }
+decodeBankAccounts : Json.Decode.Decoder (List BankAccount)
+decodeBankAccounts = Json.Decode.list decodeBankAccount
 
+
+
+-- MODEL
+-- define model for view
 type alias Model =
-  { bankAccounts : List BankAccount,
-    newOwner : String,
-    newBalance : String,
-    ibanForUpdate : String,
-    balanceForUpdate : String,
+  { bankAccounts        : List BankAccount,
+    newOwner            : String,
+    newBalance          : String,
+    ibanForUpdate       : String,
+    balanceForUpdate    : String,
     balanceUpdateAction : String,
-    ibanFrom : String,
-    ibanTo : String,
-    amountForTransfer : String,
-    error : String,
-    updateBalanceError : String,
-    createAccountError : String,
-    transferError : String,
-    closeAccountError :String,
-    ibanForClosing : String,
-    getAccountsError : String
+    ibanFrom            : String,
+    ibanTo              : String,
+    amountForTransfer   : String,
+    error               : String,
+    updateBalanceError  : String,
+    createAccountError  : String,
+    transferError       : String,
+    closeAccountError   : String,
+    ibanForClosing      : String,
+    getAccountsError    : String
   }
 
+-- initialise model
 init : ( Model, Cmd Msg )
 init =
   ( { bankAccounts = [], 
@@ -147,33 +174,34 @@ init =
       getAccountsError    = ""
     }, getAllBankAccounts )
 
-type Msg = GetAllBankAccounts | 
-           DeleteGetAllBankAccountsError |
+-- define message types
+type Msg = GetAllBankAccounts                                    | 
+           DeleteGetAllBankAccountsError                         |
            BankAccountsResult (Result String (List BankAccount)) | 
-           SetOwner String | 
-           SetBalanceForCreate String |
-           CreateBankAccount |
-           CreateBankAccountResult (Result String BankAccount) |
-           SetIbanForUpdate String |
-           SetBalanceForUpdate String |
-           SetBalanceUpdateAction String |
-           UpdateBalance |
-           UpdateBalanceResult (Result String BankAccount) |
-           SetIbanFrom String |
-           SetIbanTo String |
-           SetAmountForTransfer String |
-           Transfer |
-           TransferResult (Result String ()) |
-           DeleteUpdateBalanceError |
-           DeleteCreateAccountError |
-           DeleteTransferError |
-           SetIbanForClosing String |
-           CloseAccount |
-           DeleteCloseAccountError |
+           SetOwner String                                       | 
+           SetBalanceForCreate String                            |
+           CreateBankAccount                                     |
+           CreateBankAccountResult (Result String BankAccount)   |
+           SetIbanForUpdate String                               |
+           SetBalanceForUpdate String                            |
+           SetBalanceUpdateAction String                         |
+           UpdateBalance                                         |
+           UpdateBalanceResult (Result String BankAccount)       |
+           SetIbanFrom String                                    |
+           SetIbanTo String                                      |
+           SetAmountForTransfer String                           |
+           Transfer                                              |
+           TransferResult (Result String ())                     |
+           DeleteUpdateBalanceError                              |
+           DeleteCreateAccountError                              |
+           DeleteTransferError                                   |
+           SetIbanForClosing String                              |
+           CloseAccount                                          |
+           DeleteCloseAccountError                               |
            CloseAccountResult (Result String BankAccount)
 
 
--- ordering & comments
+-- update model according to event
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
   case msg of
@@ -221,7 +249,17 @@ update msg model =
        Err message -> ({model | ibanForClosing = "", closeAccountError = message}, Cmd.none)
     DeleteCloseAccountError         -> ({model | closeAccountError = ""}, Cmd.none)
 
--- input field validation
+
+
+-- INPUT FIELD VALIDATION
+-- check if any input field is empty
+isAnyInputFieldEmpty : List String -> Result String ()
+isAnyInputFieldEmpty fields = if List.any String.isEmpty fields
+                                    then Err "Fehler: nicht alle Felder ausgefüllt"
+                                    else Ok ()
+
+
+-- disallow non-numerical values for various operations
 validateBalanceForCreate : String -> Model -> (Model, Cmd Msg)
 validateBalanceForCreate bal m = validateBalanceLength m {m | newBalance = String.filter Char.isDigit bal} bal
 
@@ -231,16 +269,24 @@ validateBalanceForUpdate bal m = validateBalanceLength m {m | balanceForUpdate =
 validateAmountForTransfer : String -> Model -> (Model, Cmd Msg)
 validateAmountForTransfer bal m = validateBalanceLength m {m | amountForTransfer = String.filter Char.isDigit bal} bal
 
+
+-- disallow numerical values greater than 7 digits
 validateBalanceLength : Model -> Model -> String -> (Model, Cmd Msg)
 validateBalanceLength oldM newM bal = if String.length bal > 7 
                                         then (oldM, Cmd.none)
                                         else (newM, Cmd.none)
+
+-- send request to get all accounts
 getAllBankAccounts : Cmd Msg
 getAllBankAccounts = Http.get 
                         { url = baseUrl,
                           expect = expectJson BankAccountsResult decodeBankAccounts 
                         }
 
+
+
+-- REQUESTS
+-- send request to create account
 createBankAccount : Model -> (Model, Cmd Msg)
 createBankAccount model = case isAnyInputFieldEmpty [model.newOwner, model.newBalance] of
                                 Ok _        -> ( model, Http.post 
@@ -253,11 +299,7 @@ createBankAccount model = case isAnyInputFieldEmpty [model.newOwner, model.newBa
                                                   })
                                 Err message -> ({model | createAccountError = message}, Cmd.none)
 
-isAnyInputFieldEmpty : List String -> Result String ()
-isAnyInputFieldEmpty fields = if List.any String.isEmpty fields
-                                    then Err "Fehler: nicht alle Felder ausgefüllt"
-                                    else Ok ()
-
+-- send request for balance update
 updateBalance : Model -> (Model, Cmd Msg)
 updateBalance model = case validateBalanceUpdateRequest model of
                         Ok _        ->  (model, Http.post
@@ -267,6 +309,16 @@ updateBalance model = case validateBalanceUpdateRequest model of
                                             })
                         Err message -> ({model | updateBalanceError = message}, Cmd.none)
 
+-- validate input for balance updates
+validateBalanceUpdateRequest : Model -> Result String ()
+validateBalanceUpdateRequest model = case isAnyInputFieldEmpty [model.ibanForUpdate, model.balanceForUpdate] of
+                                              Ok _ -> if List.member model.balanceUpdateAction [str_WITHDRAW, str_DEPOSIT]
+                                                            then Ok ()
+                                                            else Err "Fehler: keine update action ausgewählt"
+                                              Err message -> Err message
+
+
+-- send transfer request
 transfer : Model -> (Model, Cmd Msg)
 transfer model = case isAnyInputFieldEmpty [model.ibanFrom, model.ibanTo, model.amountForTransfer] of
                           Ok _ -> (model, Http.post
@@ -277,13 +329,7 @@ transfer model = case isAnyInputFieldEmpty [model.ibanFrom, model.ibanTo, model.
                                     })
                           Err message -> ({model | transferError = message}, Cmd.none)
 
-validateBalanceUpdateRequest : Model -> Result String ()
-validateBalanceUpdateRequest model = case isAnyInputFieldEmpty [model.ibanForUpdate, model.balanceForUpdate] of
-                                              Ok _ -> if List.member model.balanceUpdateAction [str_WITHDRAW, str_DEPOSIT]
-                                                            then Ok ()
-                                                            else Err "Fehler: keine update action ausgewählt"
-                                              Err message -> Err message
-
+-- send request to close account
 closeAccount : Model -> (Model, Cmd Msg)
 closeAccount model = case isAnyInputFieldEmpty [model.ibanForClosing] of
                             Ok _ -> (model, Http.post 
@@ -294,7 +340,7 @@ closeAccount model = case isAnyInputFieldEmpty [model.ibanForClosing] of
                                         })
                             Err message -> ({model | closeAccountError = message}, Cmd.none)
                 
-
+-- decode incoming JSON data
 expectJson : (Result String a -> msg) -> Decoder a -> Expect msg
 expectJson toMsg decoder = 
   Http.expectStringResponse toMsg <|
@@ -315,10 +361,14 @@ expectJson toMsg decoder =
             Err err ->
               Err (errorToString err)
 
+-- convert empty String to empty JSON object
 convertBody : String -> String
 convertBody body = if body == "" then "{}" else body
 
 
+
+-- VIEW CREATION
+-- define and create view
 view : Model -> Html Msg
 view model = div [class "mb-5"] [
     createNavBar,
@@ -329,122 +379,7 @@ view model = div [class "mb-5"] [
     closeAccountView model
   ]
 
-getAllAccountsView : Model -> Html Msg
-getAllAccountsView model = div [ class "container mt-5"] [
-        viewBoxTitle "BankAccounts",
-        haskellBorder [
-            table [class "table"] [
-              thead [] [
-                tr [] (List.map (\str -> th [scope "col"] [text str]) ["owner", "iban", "active", "balance"])
-              ],
-              tbody [] (List.map createTableRowFromBankAccount model.bankAccounts)
-            ],
-            createHaskellButton "get all accounts" GetAllBankAccounts,
-            customErrorView model.getAccountsError DeleteGetAllBankAccountsError
-          ]
-      ]
-  
-newAccountView : Model -> Html Msg
-newAccountView model = div [class "container mt-5"] [
-    viewBoxTitle "Create BankAccount",
-    haskellBorder [
-      labelInputPairMarginBottom (LabelTextInputPair "ownerInput" "owner" "Peter" SetOwner model.newOwner),
-      labelInputPairMarginBottom (LabelTextInputPair "balanceInput" "balance" "1000" SetBalanceForCreate model.newBalance),
-      createHaskellButton "create" CreateBankAccount,
-      customErrorView model.createAccountError DeleteCreateAccountError
-    ]
-  ]
-
-ibanPlaceholder : String
-ibanPlaceholder = "CH2707888954202552370TUR"
-
-updateBalanceView : Model -> Html Msg
-updateBalanceView model = div [class "container mt-5"] [
-    viewBoxTitle "Update Balance",
-    haskellBorder [
-      labelInputPairMarginBottom (LabelTextInputPair "ibanForUpdate" "iban" ibanPlaceholder SetIbanForUpdate model.ibanForUpdate),
-      labelInputPairMarginBottom (LabelTextInputPair "amountForUpdate" "amount" "1000" SetBalanceForUpdate model.balanceForUpdate),
-      select [class "form-select mb-4", onInput SetBalanceUpdateAction] [
-        option [selected True ] [text "choose update action"],
-        option [value str_WITHDRAW] [text str_WITHDRAW],
-        option [value str_DEPOSIT] [text str_DEPOSIT]
-      ],
-      createHaskellButton "update balance" UpdateBalance,
-      customErrorView model.updateBalanceError DeleteUpdateBalanceError
-    ]
-  ]
-
-str_WITHDRAW : String
-str_WITHDRAW = "withdraw"
-
-str_DEPOSIT : String
-str_DEPOSIT = "deposit"
-
-viewBoxTitle : String -> Html Msg
-viewBoxTitle t = h3 [] [text t]
-
-customErrorView : String -> Msg -> Html Msg
-customErrorView errorMsg deleteHandler = if (errorMsg /= "") 
-      then div [class "container alert alert-danger mt-4", attribute "role" "alert"] [
-              div [class "row align-items-center"] [
-                  div [class "col-11"] [text errorMsg], 
-                  div [class "col-1"] [
-                    button [ type_ "button", class "btn haskell-btn", onClick deleteHandler] [ text "X" ]
-                  ]
-              ]
-          
-            ] 
-      else text ""
-
-transferView : Model -> Html Msg
-transferView model = div [class "container mt-5"] [
-    viewBoxTitle "Transfer",
-    haskellBorder [
-      labelInputPairMarginBottom (LabelTextInputPair "ibanFrom" "from" ibanPlaceholder SetIbanFrom model.ibanFrom),
-      labelInputPairMarginBottom (LabelTextInputPair "ibanTo" "to" ibanPlaceholder SetIbanTo model.ibanTo),
-      labelInputPairMarginBottom (LabelTextInputPair "amountTransfer" "amount" "1000" SetAmountForTransfer model.amountForTransfer),
-      createHaskellButton "transfer" Transfer,
-      customErrorView model.transferError DeleteTransferError
-    ]
-  ]
-
-closeAccountView : Model -> Html Msg
-closeAccountView model = div [class "container mt-5"] [
-    viewBoxTitle "Close BankAccount",
-    haskellBorder [
-      labelInputPairMarginBottom (LabelTextInputPair "ibanForClosing" "iban" ibanPlaceholder SetIbanForClosing model.ibanForClosing),
-      createHaskellButton "close account" CloseAccount,
-      customErrorView model.closeAccountError DeleteCloseAccountError
-    ]
-  ]
-
-createHaskellButton : String -> Msg -> Html Msg
-createHaskellButton bText handler = 
-              button [ type_ "button", class "btn haskell-btn", onClick handler] [ text bText ]
-
-labelInputPairMarginBottom : LabelTextInputPair -> Html Msg
-labelInputPairMarginBottom data = div [class "mb-4"] (createLabelTextInputPair data)
-
-createLabelTextInputPair : LabelTextInputPair -> List (Html Msg)
-createLabelTextInputPair data = [
-          label [for data.labelId, class "form-label"] [text data.labelText],
-          input [value data.valueModel, type_ "text", class "form-control", id data.labelId, placeholder data.inputPlaceholder, onInput data.onInputHandler] [] 
-        ]
-
-haskellBorder : List (Html Msg) -> Html Msg
-haskellBorder content = div [class "haskell-border p-4"] content
-
-getAccountStatus : BankAccount -> String
-getAccountStatus acc = if acc.active then "active" else "inactive"
-
-createTableRowFromBankAccount : BankAccount -> Html Msg
-createTableRowFromBankAccount acc = tr [] [
-    td [] [text acc.owner],
-    td [] [text acc.iban],
-    td [] [text (getAccountStatus acc)],
-    td [] [text (String.fromInt acc.balance)]
-  ]
-
+-- create navbar
 createNavBar : Html Msg
 createNavBar = div [class "mb-4", style "background-color" "#5E5184", style "height" "100px"] [
       div [class "container-fluid"] [
@@ -464,3 +399,133 @@ createNavBar = div [class "mb-4", style "background-color" "#5E5184", style "hei
           ]
       ]
   ]
+
+-- create view box for table of accounts
+getAllAccountsView : Model -> Html Msg
+getAllAccountsView model = div [ class "container mt-5"] [
+        viewBoxTitle "BankAccounts",
+        haskellBorder [
+            table [class "table"] [
+              thead [] [
+                tr [] (List.map (\str -> th [scope "col"] [text str]) ["owner", "iban", "active", "balance"])
+              ],
+              tbody [] (List.map createTableRowFromBankAccount model.bankAccounts)
+            ],
+            createHaskellButton "get all accounts" GetAllBankAccounts,
+            customErrorView model.getAccountsError DeleteGetAllBankAccountsError
+          ]
+      ]
+
+-- create table row element for one BankAccount
+createTableRowFromBankAccount : BankAccount -> Html Msg
+createTableRowFromBankAccount acc = tr [] [
+    td [] [text acc.owner],
+    td [] [text acc.iban],
+    td [] [text (getAccountStatus acc)],
+    td [] [text (String.fromInt acc.balance)]
+  ]
+
+  -- return string for whether BankAccount is active or not
+getAccountStatus : BankAccount -> String
+getAccountStatus acc = if acc.active then "active" else "inactive"
+
+
+-- create view box for account creation
+newAccountView : Model -> Html Msg
+newAccountView model = div [class "container mt-5"] [
+    viewBoxTitle "Create BankAccount",
+    haskellBorder [
+      labelInputPairMarginBottom (LabelTextInputPair "ownerInput" "owner" "Peter" SetOwner model.newOwner),
+      labelInputPairMarginBottom (LabelTextInputPair "balanceInput" "balance" "1000" SetBalanceForCreate model.newBalance),
+      createHaskellButton "create" CreateBankAccount,
+      customErrorView model.createAccountError DeleteCreateAccountError
+    ]
+  ]
+
+-- create view box for balance updates
+updateBalanceView : Model -> Html Msg
+updateBalanceView model = div [class "container mt-5"] [
+    viewBoxTitle "Update Balance",
+    haskellBorder [
+      labelInputPairMarginBottom (LabelTextInputPair "ibanForUpdate" "iban" ibanPlaceholder SetIbanForUpdate model.ibanForUpdate),
+      labelInputPairMarginBottom (LabelTextInputPair "amountForUpdate" "amount" "1000" SetBalanceForUpdate model.balanceForUpdate),
+      select [class "form-select mb-4", onInput SetBalanceUpdateAction] [
+        option [selected True ] [text "choose update action"],
+        option [value str_WITHDRAW] [text str_WITHDRAW],
+        option [value str_DEPOSIT] [text str_DEPOSIT]
+      ],
+      createHaskellButton "update balance" UpdateBalance,
+      customErrorView model.updateBalanceError DeleteUpdateBalanceError
+    ]
+  ]
+
+-- create view box for transfers
+transferView : Model -> Html Msg
+transferView model = div [class "container mt-5"] [
+    viewBoxTitle "Transfer",
+    haskellBorder [
+      labelInputPairMarginBottom (LabelTextInputPair "ibanFrom" "from" ibanPlaceholder SetIbanFrom model.ibanFrom),
+      labelInputPairMarginBottom (LabelTextInputPair "ibanTo" "to" ibanPlaceholder SetIbanTo model.ibanTo),
+      labelInputPairMarginBottom (LabelTextInputPair "amountTransfer" "amount" "1000" SetAmountForTransfer model.amountForTransfer),
+      createHaskellButton "transfer" Transfer,
+      customErrorView model.transferError DeleteTransferError
+    ]
+  ]
+
+-- create view box for closing accounts
+closeAccountView : Model -> Html Msg
+closeAccountView model = div [class "container mt-5"] [
+    viewBoxTitle "Close BankAccount",
+    haskellBorder [
+      labelInputPairMarginBottom (LabelTextInputPair "ibanForClosing" "iban" ibanPlaceholder SetIbanForClosing model.ibanForClosing),
+      createHaskellButton "close account" CloseAccount,
+      customErrorView model.closeAccountError DeleteCloseAccountError
+    ]
+  ]
+
+-- create error message box
+customErrorView : String -> Msg -> Html Msg
+customErrorView errorMsg deleteHandler = if (errorMsg /= "") 
+      then div [class "container alert alert-danger mt-4", attribute "role" "alert"] [
+              div [class "row align-items-center"] [
+                  div [class "col-11"] [text errorMsg], 
+                  div [class "col-1"] [
+                    button [ type_ "button", class "btn haskell-btn", onClick deleteHandler] [ text "X" ]
+                  ]
+              ]
+            ] 
+      else text ""
+
+
+
+-- CUSTOM HTML ELEMENTS
+-- create formatted title for view boxes
+viewBoxTitle : String -> Html Msg
+viewBoxTitle t = h3 [] [text t]
+
+-- create view box
+haskellBorder : List (Html Msg) -> Html Msg
+haskellBorder content = div [class "haskell-border p-4"] content
+
+-- create button
+createHaskellButton : String -> Msg -> Html Msg
+createHaskellButton bText handler = 
+              button [ type_ "button", class "btn haskell-btn", onClick handler] [ text bText ]
+
+-- create input field with label
+type alias LabelTextInputPair = 
+    {
+      labelId           : String,
+      labelText         : String,
+      inputPlaceholder  : String,
+      onInputHandler    : String -> Msg,
+      valueModel        : String
+    }
+
+createLabelTextInputPair : LabelTextInputPair -> List (Html Msg)
+createLabelTextInputPair data = [
+          label [for data.labelId, class "form-label"] [text data.labelText],
+          input [value data.valueModel, type_ "text", class "form-control", id data.labelId, placeholder data.inputPlaceholder, onInput data.onInputHandler] [] 
+        ]
+labelInputPairMarginBottom : LabelTextInputPair -> Html Msg
+labelInputPairMarginBottom data = div [class "mb-4"] (createLabelTextInputPair data)
