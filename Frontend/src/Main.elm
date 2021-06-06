@@ -4,19 +4,14 @@ import Browser
 import Html exposing (..)
 import Html.Events exposing (onClick)
 import Html.Attributes exposing (..)
-import Json.Decode exposing (Decoder, at, list, string, succeed, decodeString, errorToString)
+import Json.Decode exposing (Decoder, succeed, decodeString, errorToString)
 import Http exposing (expectJson, Expect)
 
 import Json.Encode
-import Json.Decode exposing (field, string)
+import Json.Decode exposing (field)
 import Html.Events exposing (onInput)
 import Http
-import Http
-import Http exposing (expectWhatever)
-import Http
 import Platform.Cmd exposing (Cmd)
-import Http
-import Http
 
 
 
@@ -255,7 +250,7 @@ update msg model =
 -- check if any input field is empty
 isAnyInputFieldEmpty : List String -> Result String ()
 isAnyInputFieldEmpty fields = if List.any String.isEmpty fields
-                                    then Err "Fehler: nicht alle Felder ausgefüllt"
+                                    then Err "Fehler: nicht alle Felder ausgefüllt."
                                     else Ok ()
 
 
@@ -279,7 +274,8 @@ validateBalanceLength oldM newM bal = if String.length bal > 7
 -- send request to get all accounts
 getAllBankAccounts : Cmd Msg
 getAllBankAccounts = Http.get 
-                        { url = baseUrl,
+                        { 
+                          url = baseUrl,
                           expect = expectJson BankAccountsResult decodeBankAccounts 
                         }
 
@@ -299,6 +295,7 @@ createBankAccount model = case isAnyInputFieldEmpty [model.newOwner, model.newBa
                                                   })
                                 Err message -> ({model | createAccountError = message}, Cmd.none)
 
+
 -- send request for balance update
 updateBalance : Model -> (Model, Cmd Msg)
 updateBalance model = case validateBalanceUpdateRequest model of
@@ -314,13 +311,13 @@ validateBalanceUpdateRequest : Model -> Result String ()
 validateBalanceUpdateRequest model = case isAnyInputFieldEmpty [model.ibanForUpdate, model.balanceForUpdate] of
                                               Ok _ -> if List.member model.balanceUpdateAction [str_WITHDRAW, str_DEPOSIT]
                                                             then Ok ()
-                                                            else Err "Fehler: keine update action ausgewählt"
+                                                            else Err "Fehler: keine update action ausgewählt."
                                               Err message -> Err message
 
 
 -- send transfer request
 transfer : Model -> (Model, Cmd Msg)
-transfer model = case isAnyInputFieldEmpty [model.ibanFrom, model.ibanTo, model.amountForTransfer] of
+transfer model = case validateTransferRequest model of
                           Ok _ -> (model, Http.post
                                     {
                                       url = baseUrl ++ "/transfer",
@@ -328,6 +325,14 @@ transfer model = case isAnyInputFieldEmpty [model.ibanFrom, model.ibanTo, model.
                                       expect = expectJson TransferResult (succeed ()) 
                                     })
                           Err message -> ({model | transferError = message}, Cmd.none)
+
+validateTransferRequest : Model -> Result String ()
+validateTransferRequest model = case isAnyInputFieldEmpty [model.ibanFrom, model.ibanTo, model.amountForTransfer] of
+                          Ok _ -> if model.ibanFrom == model.ibanTo 
+                                        then Err "Fehler: gleiche IBANs."
+                                        else Ok ()
+                          Err message -> Err message
+
 
 -- send request to close account
 closeAccount : Model -> (Model, Cmd Msg)
@@ -339,26 +344,27 @@ closeAccount model = case isAnyInputFieldEmpty [model.ibanForClosing] of
                                           expect = expectJson CloseAccountResult decodeBankAccount
                                         })
                             Err message -> ({model | closeAccountError = message}, Cmd.none)
-                
+
+
 -- decode incoming JSON data
 expectJson : (Result String a -> msg) -> Decoder a -> Expect msg
 expectJson toMsg decoder = 
   Http.expectStringResponse toMsg <|
     \response ->
       case response of
-        Http.BadUrl_ url ->
+        Http.BadUrl_ url                ->
           Err ("Fehler: Http.BadUrl: " ++ url)
-        Http.Timeout_ ->
+        Http.Timeout_                   ->
           Err "Fehler: Http.Timeout"
-        Http.NetworkError_ ->
+        Http.NetworkError_              ->
           Err "Fehler: Http.NetworkError"
-        Http.BadStatus_ metadata body ->
+        Http.BadStatus_ metadata body   ->
           Err body
-        Http.GoodStatus_ metadata body ->
+        Http.GoodStatus_ metadata body  ->
           case decodeString decoder (convertBody body) of
-            Ok value ->
+            Ok value  ->
               Ok value
-            Err err ->
+            Err err   ->
               Err (errorToString err)
 
 -- convert empty String to empty JSON object
@@ -527,5 +533,6 @@ createLabelTextInputPair data = [
           label [for data.labelId, class "form-label"] [text data.labelText],
           input [value data.valueModel, type_ "text", class "form-control", id data.labelId, placeholder data.inputPlaceholder, onInput data.onInputHandler] [] 
         ]
+
 labelInputPairMarginBottom : LabelTextInputPair -> Html Msg
 labelInputPairMarginBottom data = div [class "mb-4"] (createLabelTextInputPair data)

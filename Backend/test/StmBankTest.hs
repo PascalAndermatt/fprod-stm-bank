@@ -1,11 +1,9 @@
 module Main (main) where
-import Test.Tasty ( defaultMain, testGroup, TestTree )
+import Test.Tasty ( defaultMain, testGroup )
 import Test.Tasty.HUnit ( testCase, (@?=) )
 import Test.Tasty.Providers
 import Test.Tasty.QuickCheck
-import Test.QuickCheck.Gen
-import Control.Concurrent.STM (newTVarIO)
-import qualified StmBank (StmResult (..), BankAccount (..), maybeAccountsForTransfer, maybeResult, isOwnerInValid, createIban)
+import qualified StmBank (StmResult (..), maybeResult, isOwnerInvalid, createIban)
 
 
 main :: IO ()
@@ -20,16 +18,16 @@ tests = testGroup "Tests" [ isOwnerInvalidUnitTests,
 isOwnerInvalidUnitTests :: TestTree
 isOwnerInvalidUnitTests = testGroup "is owner valid - unit tests"
   [ testCase "owner with non-alpha chars" $
-      StmBank.isOwnerInValid "34dfgdos" @?= True,
+      StmBank.isOwnerInvalid "34dfgdos" @?= True,
 
     testCase "owner with alpha chars" $
-      StmBank.isOwnerInValid "peter" @?= False,
+      StmBank.isOwnerInvalid "peter" @?= False,
 
     testCase "owner with arbitrary alpha chars" $
-      StmBank.isOwnerInValid "sjdfsdsjdgsighsgurig" @?= False,
+      StmBank.isOwnerInvalid "sjdfsdsjdgsighsgurig" @?= False,
 
     testCase "owner with arbitrary non-alpha chars" $
-      StmBank.isOwnerInValid ".sgdg-?" @?= True
+      StmBank.isOwnerInvalid ".sgdg-?" @?= True
   ]
 
 createIbanUnitTests :: TestTree
