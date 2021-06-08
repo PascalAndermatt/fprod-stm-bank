@@ -15,6 +15,7 @@ Im Backend werden die Eingaben noch auf ihre Sinnhaftigkeit geprüft, z. B. wird
 # Anleitung
 Nachdem das Repository gecloned wurde können die einzelnen Teile folgend installiert und gestartet werden:
 ## Backend
+### Installation Backend
 ```
 cd Backend
 ```
@@ -30,7 +31,6 @@ cabal run stmbank
 cabal run stmbank-test
 ```
 Nach Start ist das Backend unter http://localhost:4000/ erreichbar und kann auch mit curl oder Postman, etc. verwendet werden.
-### Installation Backend
 
 ## Frontend
 ### Installation Frontend
