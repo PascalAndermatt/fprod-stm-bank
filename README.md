@@ -44,4 +44,4 @@ npm install
 ```
 npm run dev
 ```
-Nach Start ist das Backend unter http://localhost:8000/ erreichbar.
+Nach Start ist das Frontend unter http://localhost:8000/ erreichbar.
