@@ -1,7 +1,7 @@
 # STM-Bank in Haskell und Elm
 Projekt für das Modul Functional Program Design (fprod) der FHNW Hochschule für Technik.
 
-![image](https://user-images.githubusercontent.com/36758233/121088110-89e73000-c7e5-11eb-8318-e19bcfa775b9.png)
+![image](https://user-images.githubusercontent.com/36758233/121358206-b5c3fc00-c932-11eb-9ff6-01449ccb4b49.png)
 
 # Beschreibung
 In diesem Projekt wurde eine beispielhafte Bankapplikation entwickelt, wie sie auch aus anderen Modulen (vesys, conpr) bekannt ist. Dabei wurden die Software Transactional Memory-Abstraktionen von GHC verwendet, um bei potenziell nebenläufigen Vorgängen deren Atomizität und somit insgesamt die Datenkonsistenz zu garantieren.
