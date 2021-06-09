@@ -390,16 +390,17 @@ createNavBar : Html Msg
 createNavBar = div [class "mb-4", style "background-color" "#5E5184", style "height" "100px"] [
       div [class "container-fluid"] [
         div [class "row align-items-center gx-5"] [
-            
             div [class "col-1 p-3"] [
                 img [src "/src/assets/haskell.png", width 50, height 50] []
             ],
-            h1 [class "col-3 p-3"] [text "STM Bank"],
-            div [class "col-8 container"] [
+            h1 [class "col-3 p-3"] [text "STM-Bank"],
+            div [class "col-8"] [
               div [class "row justify-content-end"] [
-                h6 [class "col-12 align-self-end"] [text "Authors:"],
-                h6 [class "col-12 align-self-end"] [text "Pascal Andermatt"],
-                h6 [class "col-12 align-self-end"] [text "Turan Ledermann"]
+                div [class "col-3"] [
+                  h6 [] [text "Authors:"],
+                  h6 [] [text "Pascal Andermatt"],
+                  h6 [] [text "Turan Ledermann"]
+                ]
               ]
             ]
           ]
