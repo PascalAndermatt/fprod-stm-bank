@@ -1,7 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
+
 {-|
-Dieses Modul enthält Funktionen um...
+    This module allows Cross-Origin Resource Sharing (CORS)
 -}
+
 module StmBank.Cors 
 (
     corsified

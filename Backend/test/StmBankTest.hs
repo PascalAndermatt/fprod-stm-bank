@@ -1,4 +1,11 @@
+{-# LANGUAGE OverloadedStrings #-}
+
+{-|
+    This module contains the test suite for the bank application 
+-}
+
 module Main (main) where
+
 import Test.Tasty ( defaultMain, testGroup )
 import Test.Tasty.HUnit ( testCase, (@?=) )
 import Test.Tasty.Providers

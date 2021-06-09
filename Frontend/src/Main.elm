@@ -1,4 +1,9 @@
+
 module Main exposing (..)
+
+{-|
+    This module contains the frontend for the bank application 
+-}
 
 import Browser
 import Html exposing (..)

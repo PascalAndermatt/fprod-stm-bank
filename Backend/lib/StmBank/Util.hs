@@ -1,7 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
+
 {-|
-Dieses Modul enthält Funktionen um...
+    This module contains utility functions
 -}
+
 module StmBank.Util 
 (
     stringToJson, generateRandomSalt

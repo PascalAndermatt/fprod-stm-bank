@@ -1,7 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
+
 {-|
-    Dieses Modul enthält Funktionen ..
+    This module contains the logic for the bank application
 -}
+
 module StmBank
 (
     getInitialAccounts, createInitialBank, findBankAccountById,

@@ -1,8 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 {-|
-Dieses Modul enthält den Einstiegspunkt um die Applikation zu starten.
+    This module contains the main entrypoint and logic for the server 
 -}
+
 module Main where
 
 import qualified StmBank
