@@ -13,6 +13,10 @@ Sowohl im Frontend als auch im Backend werden die Eingaben jeweils auf ihr Forma
 Im Backend werden die Eingaben noch auf ihre Sinnhaftigkeit geprüft, z. B. wird bei Zahlenangaben unter 0 eine Fehlermeldung an das Frontend gesendet, welches diese dann anzeigt.
 
 # Anleitung
+## Voraussetzungen
+GHC Version: 8.10.4
+cabal-version: 3.0
+
 Nachdem das Repository gecloned wurde können die einzelnen Teile folgend installiert und gestartet werden:
 ## Backend
 ### Installation Backend
