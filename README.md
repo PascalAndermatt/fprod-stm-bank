@@ -1,4 +1,4 @@
-# STM Bank in Haskell und Elm
+# STM-Bank in Haskell und Elm
 Projekt für das Modul Functional Program Design (fprod) der FHNW Hochschule für Technik.
 
 ![image](https://user-images.githubusercontent.com/36758233/121088110-89e73000-c7e5-11eb-8318-e19bcfa775b9.png)
@@ -15,6 +15,7 @@ Im Backend werden die Eingaben noch auf ihre Sinnhaftigkeit geprüft, z. B. wird
 # Anleitung
 ## Voraussetzungen
 GHC Version: 8.10.4
+
 cabal-version: 3.0
 
 Nachdem das Repository gecloned wurde können die einzelnen Teile folgend installiert und gestartet werden:
