@@ -1,7 +1,7 @@
 cabal-version:       3.0
 
 name:                stm-bank
-version:             0.1.0.0
+version:             1.0.0.0
 author:              Pascal Andermatt, Turan Ledermann
 maintainer:          pascal.andermatt@students.fhnw.ch, turan.ledermann@students.fhnw.ch
 build-type:          Simple
