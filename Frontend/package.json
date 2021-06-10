@@ -4,6 +4,7 @@
   "description": "STM Bank Frontend",
   "main": "index.html",
   "dependencies": {
+    "elm": "^0.19.1-5",
     "elm-hot-webpack-loader": "^1.1.8",
     "elm-webpack-loader": "^7.0.1",
     "file-loader": "^0.8.5",
