@@ -16,7 +16,7 @@ Im Backend werden die Eingaben noch auf ihre Sinnhaftigkeit geprüft, z. B. wird
 ## Voraussetzungen
 GHC Version: 8.10.4
 
-cabal-version: 3.0
+cabal-version: 3.4.0.0
 
 Nachdem das Repository gecloned wurde können die einzelnen Teile folgend installiert und gestartet werden:
 ## Backend
