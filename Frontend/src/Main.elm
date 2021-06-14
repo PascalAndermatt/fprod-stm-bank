@@ -354,8 +354,8 @@ closeAccount model = case isAnyInputFieldEmpty [model.ibanForClosing] of
 -- decode incoming JSON data
 expectJson : (Result String a -> msg) -> Decoder a -> Expect msg
 expectJson toMsg decoder = 
-  Http.expectStringResponse toMsg <|
-    \response ->
+  Http.expectStringResponse toMsg
+    (\response ->
       case response of
         Http.BadUrl_ url                ->
           Err ("Fehler: Http.BadUrl: " ++ url)
@@ -370,7 +370,7 @@ expectJson toMsg decoder =
             Ok value  ->
               Ok value
             Err err   ->
-              Err (errorToString err)
+              Err (errorToString err))
 
 -- convert empty String to empty JSON object
 convertBody : String -> String
