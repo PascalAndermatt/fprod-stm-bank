@@ -394,7 +394,7 @@ view model = div [class "mb-5"] [
 createNavBar : Html Msg
 createNavBar = div [class "mb-4", style "background-color" "#5E5184", style "height" "100px"] [
       div [class "container-fluid"] [
-        div [class "row align-items-center gx-5"] [
+        div [class "row align-items-center"] [
             div [class "col-1 p-3"] [
                 img [src "/src/assets/haskell.png", width 50, height 50] []
             ],
